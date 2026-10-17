@@ -33,6 +33,14 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK components
+        run: |
+          yes | sdkmanager --licenses
+          sdkmanager --install "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
       - name: Prepare Keystore and Environment Config
         run: |
           # Create .env from .env.example if missing
@@ -41,18 +49,30 @@ jobs:
             cp .env.example .env
           fi
 
-          # Decode debug.keystore from debug.keystore.base64
+          # Restore debug.keystore from base64 if available; otherwise generate a valid one for CI.
           if [ ! -f debug.keystore ] && [ -f debug.keystore.base64 ]; then
             echo "Restoring debug.keystore from base64..."
             base64 -d debug.keystore.base64 > debug.keystore
+          fi
+
+          if [ ! -f debug.keystore ]; then
+            echo "Generating debug.keystore for CI..."
+            keytool -genkeypair -v \
+              -keystore debug.keystore \
+              -storepass android \
+              -keypass android \
+              -alias androiddebugkey \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
           fi
 
           # Ensure gradlew has execute permissions
           chmod +x gradlew
 
       - name: Run Unit Tests
-        run: ./gradlew testDebugUnitTest --continue || true
-        continue-on-error: true
+        run: ./gradlew testDebugUnitTest --stacktrace
 
       - name: Build Debug APK
         run: ./gradlew assembleDebug --stacktrace
