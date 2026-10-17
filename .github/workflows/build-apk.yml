@@ -52,26 +52,16 @@ jobs:
 
           export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
 
-          # Accept licenses without failing the job
-          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          # Accept all licenses without interactive prompts
+          yes 2>/dev/null | sdkmanager --sdk_root="$ANDROID_SDK_ROOT" --licenses >/dev/null || true
 
-          # Install required Android packages with retries
-          for attempt in 1 2 3; do
-            if yes | sdkmanager --install "platform-tools" "platforms;android-36" "build-tools;36.0.0" >/dev/null 2>&1; then
-              echo "Android SDK packages installed successfully"
-              break
-            fi
+          # Install required Android packages
+          sdkmanager --sdk_root="$ANDROID_SDK_ROOT" --install \
+            "platform-tools" \
+            "platforms;android-36" \
+            "build-tools;36.0.0"
 
-            echo "sdkmanager install failed, retrying ($attempt/3)"
-            sleep 10
-
-            if [ "$attempt" -eq 3 ]; then
-              echo "Android SDK install failed after 3 attempts"
-              exit 1
-            fi
-          done
-
-          sdkmanager --list >/dev/null 2>&1 || true
+          sdkmanager --sdk_root="$ANDROID_SDK_ROOT" --list >/dev/null 2>&1 || true
 
       - name: Prepare Keystore and Environment Config
         run: |
