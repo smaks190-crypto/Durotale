@@ -38,7 +38,7 @@ jobs:
         env:
           ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
         run: |
-          set -eux
+          set -euxo pipefail
 
           mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
 
@@ -52,16 +52,26 @@ jobs:
 
           export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
 
-          # Accept SDK licenses non-interactively. Some license prompts can still return a non-zero
-          # exit code even after printing "All SDK package licenses accepted", so don't let that
-          # fail the job.
-          yes | sdkmanager --licenses || true
+          # Accept licenses without failing the job
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
 
-          # Install required packages non-interactively
-          yes | sdkmanager --install "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+          # Install required Android packages with retries
+          for attempt in 1 2 3; do
+            if yes | sdkmanager --install "platform-tools" "platforms;android-36" "build-tools;36.0.0" >/dev/null 2>&1; then
+              echo "Android SDK packages installed successfully"
+              break
+            fi
 
-          # Optional: list installed packages for debugging
-          sdkmanager --list || true
+            echo "sdkmanager install failed, retrying ($attempt/3)"
+            sleep 10
+
+            if [ "$attempt" -eq 3 ]; then
+              echo "Android SDK install failed after 3 attempts"
+              exit 1
+            fi
+          done
+
+          sdkmanager --list >/dev/null 2>&1 || true
 
       - name: Prepare Keystore and Environment Config
         run: |
@@ -105,7 +115,7 @@ jobs:
             exit 1
           fi
           echo "Found APK: $APK_PATH"
-          echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
+          echo "apk_path=$APK_PATH" >> "$GITHUB_OUTPUT"
 
       - name: Upload APK as Artifact
         uses: actions/upload-artifact@v4
