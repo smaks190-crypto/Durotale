@@ -52,8 +52,16 @@ jobs:
 
           export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
 
-          yes | sdkmanager --licenses
-          sdkmanager --install "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+          # Accept SDK licenses non-interactively. Some license prompts can still return a non-zero
+          # exit code even after printing "All SDK package licenses accepted", so don't let that
+          # fail the job.
+          yes | sdkmanager --licenses || true
+
+          # Install required packages non-interactively
+          yes | sdkmanager --install "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+          # Optional: list installed packages for debugging
+          sdkmanager --list || true
 
       - name: Prepare Keystore and Environment Config
         run: |
