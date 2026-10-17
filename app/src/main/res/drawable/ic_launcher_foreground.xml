@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Heart drop shadow -->
+    <path
+        android:fillColor="#55000000"
+        android:pathData="M38,36h14v6h-14z M58,36h14v6h-14z M32,42h46v14h-46z M38,56h34v8h-34z M44,64h22v8h-22z M50,72h10v6h-10z" />
+    
+    <!-- Undertale Red Soul Heart (Pixelated blocks) -->
+    <path
+        android:fillColor="#FF1744"
+        android:pathData="M36,33h14v7h-14z M56,33h14v7h-14z M30,39h46v15h-46z M36,54h34v8h-34z M42,62h22v8h-22z M48,70h10v7h-10z" />
+    
+    <!-- Inner Heart Highlight -->
+    <path
+        android:fillColor="#FF8A80"
+        android:pathData="M38,35h8v4h-8z M33,41h8v8h-8z" />
+
+    <!-- Golden Key of Freedom overlay -->
+    <path
+        android:fillColor="#FFD700"
+        android:pathData="M66,60h16v6h-16z M76,66h6v4h-6z M70,66h4v3h-4z M60,56h8v14h-8z M62,58h4v10h-4z" />
+</vector>

@@ -1,0 +1,6 @@
+{
+  "name": "Durotale",
+  "description": "Ретро-игра в стиле Undertale: Побег из дурки от санитара Михалыча с пошаговыми битвами, звуковыми эффектами и секретными концовками.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
