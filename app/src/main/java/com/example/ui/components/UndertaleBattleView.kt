@@ -13,18 +13,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.example.model.BattlePhase
 import com.example.model.BattleState
+import com.example.ui.render.PixelSprites
+import com.example.ui.render.drawPixelSprite
 import com.example.ui.theme.RetroBoxBlack
 import com.example.ui.theme.RetroGreen
 import com.example.ui.theme.RetroOrange
 import com.example.ui.theme.RetroRed
 import com.example.ui.theme.RetroWhite
 import com.example.ui.theme.RetroYellow
+import kotlin.math.cos
+import kotlin.math.sin
 
 @Composable
 fun UndertaleBattleView(
@@ -71,56 +75,123 @@ fun UndertaleBattleView(
                 )
             }
 
-            // Undertale black background with green grid lines
+            // Undertale black background with green starfield/grid lines
             drawRect(color = Color.Black)
             for (gx in 40 until 600 step 40) {
-                strokeRect(gx.toFloat(), 15f, 40f, 150f, Color(0xFF0D2614), 1f)
+                strokeRect(gx.toFloat(), 15f, 40f, 150f, Color(0xFF0A1F10), 1f)
             }
 
-            // ENEMY: Санитар Михалыч (Undertale Monster Boss style)
-            val shakeX = if (battle.enemyShake > 0) ((Math.random() - 0.5) * 14.0).toFloat() else 0f
-            val ex = 275f + shakeX
-            val ey = 25f
+            // ENEMY: САНИТАР МИХАЛЫЧ (Undertale Monster Boss style)
+            val shakeOffset = if (battle.enemyShake > 0) ((Math.random() - 0.5) * 16.0).toFloat() else 0f
+            val bossBaseX = 265f + shakeOffset
+            val bossBaseY = 16f
 
-            // Enemy HP Bar
-            rect(250f, 12f, 140f, 10f, Color(0xFF444444))
+            // Breathing / Sinuous Idle Animation
+            val breath = sin(tick * 0.08f).toFloat() * 2.5f
+            val armSwing = cos(tick * 0.08f).toFloat() * 2f
+
+            // Enemy HP Bar above head
+            rect(250f, 10f, 140f, 9f, Color(0xFF333333))
             val hpRatio = (battle.enemyHP.toFloat() / battle.enemyMaxHP.toFloat()).coerceIn(0f, 1f)
-            rect(250f, 12f, 140f * hpRatio, 10f, RetroGreen)
-            strokeRect(250f, 12f, 140f, 10f, RetroWhite, 2f)
+            rect(250f, 10f, 140f * hpRatio, 9f, RetroGreen)
+            strokeRect(250f, 10f, 140f, 9f, RetroWhite, 1.5f)
 
-            // Boss Sprite: Михалыч
-            // Cap
-            rect(ex + 18f, ey + 6f, 54f, 16f, Color.White)
-            rect(ex + 41f, ey + 9f, 8f, 10f, Color(0xFFFF3D00))
-            rect(ex + 38f, ey + 12f, 14f, 4f, Color(0xFFFF3D00))
+            val bossPixelScale = 2.1f * scaleX
 
-            // Head
-            rect(ex + 14f, ey + 24f, 62f, 42f, Color.White)
-            // Angry eyebrows & eyes
-            rect(ex + 24f, ey + 34f, 14f, 5f, Color.Black)
-            rect(ex + 52f, ey + 34f, 14f, 5f, Color.Black)
-            rect(ex + 28f, ey + 40f, 6f, 6f, Color.Black)
-            rect(ex + 56f, ey + 40f, 6f, 6f, Color.Black)
-            // Mustache
-            rect(ex + 26f, ey + 52f, 38f, 7f, Color.Black)
+            // 1. Draw Torso
+            val torsoTopLeft = Offset((bossBaseX + 16f) * scaleX, (bossBaseY + 44f + breath * 0.5f) * scaleY)
+            drawPixelSprite(
+                matrix = PixelSprites.BOSS_TORSO,
+                palette = PixelSprites.BossMonochromePalette,
+                topLeft = torsoTopLeft,
+                pixelSize = bossPixelScale
+            )
 
-            // Torso White Coat
-            rect(ex + 4f, ey + 68f, 82f, 68f, Color.White)
-            rect(ex + 42f, ey + 68f, 6f, 68f, Color.Black)
-            // Giant Syringe in right hand
-            rect(ex + 90f, ey + 52f, 12f, 36f, Color(0xFF76FF03))
-            rect(ex + 94f, ey + 36f, 4f, 16f, Color.White)
+            // 2. Draw Right Arm with Giant Syringe
+            val rightArmTopLeft = Offset((bossBaseX + 70f + armSwing) * scaleX, (bossBaseY + 38f + breath) * scaleY)
+            drawPixelSprite(
+                matrix = PixelSprites.BOSS_ARM_SYRINGE,
+                palette = PixelSprites.BossMonochromePalette,
+                topLeft = rightArmTopLeft,
+                pixelSize = bossPixelScale
+            )
 
-            // Slash animation & damage indicator
+            // 3. Draw Left Arm with Key Ring
+            val leftArmTopLeft = Offset((bossBaseX - 12f - armSwing) * scaleX, (bossBaseY + 42f + breath) * scaleY)
+            drawPixelSprite(
+                matrix = PixelSprites.BOSS_ARM_KEYS,
+                palette = PixelSprites.BossMonochromePalette,
+                topLeft = leftArmTopLeft,
+                pixelSize = bossPixelScale
+            )
+
+            // 4. Draw Head with emotional expression matrix
+            val headMatrix = when (battle.bossEmotion) {
+                "shock" -> PixelSprites.BOSS_HEAD_SHOCKED
+                "hurt" -> PixelSprites.BOSS_HEAD_HURT
+                else -> PixelSprites.BOSS_HEAD_NORMAL
+            }
+            val headTopLeft = Offset((bossBaseX + 18f) * scaleX, (bossBaseY + breath) * scaleY)
+            drawPixelSprite(
+                matrix = headMatrix,
+                palette = PixelSprites.BossMonochromePalette,
+                topLeft = headTopLeft,
+                pixelSize = bossPixelScale
+            )
+
+            // CURVED SLASH EFFECT ON HIT
             if (battle.phase == BattlePhase.SLASH_ANIM) {
-                drawLine(
-                    color = Color(0xFFFF1744),
-                    start = Offset((ex + 10f) * scaleX, (ey + 15f) * scaleY),
-                    end = Offset((ex + 80f) * scaleX, (ey + 125f) * scaleY),
-                    strokeWidth = 5f * scaleX
+                val p = battle.slashProgress.coerceIn(0f, 1f)
+                val slashStart = Offset((bossBaseX + 10f) * scaleX, (bossBaseY + 20f) * scaleY)
+                val slashControl = Offset((bossBaseX + 50f + p * 20f) * scaleX, (bossBaseY + 80f) * scaleY)
+                val slashEnd = Offset(
+                    (bossBaseX + 10f + p * 80f) * scaleX,
+                    (bossBaseY + 20f + p * 120f) * scaleY
                 )
-                // Red damage star
-                rect(ex + 30f, ey + 50f, 25f, 12f, RetroYellow)
+
+                val slashPath = Path().apply {
+                    moveTo(slashStart.x, slashStart.y)
+                    quadraticTo(slashControl.x, slashControl.y, slashEnd.x, slashEnd.y)
+                }
+
+                // Outer red slash glow
+                drawPath(
+                    path = slashPath,
+                    color = Color(0xFFFF1744),
+                    style = Stroke(width = 7f * scaleX)
+                )
+                // Inner white slice
+                drawPath(
+                    path = slashPath,
+                    color = Color.White,
+                    style = Stroke(width = 3f * scaleX)
+                )
+
+                // BOUNCING PIXEL DAMAGE NUMBER JUMP
+                val dmgText = battle.damageText
+                if (dmgText != null) {
+                    val dmgX = (bossBaseX + 32f) * scaleX
+                    val dmgY = (bossBaseY + 36f + battle.damageTextY) * scaleY
+
+                    // Draw pixelated damage indicator
+                    drawRect(
+                        color = Color.Black,
+                        topLeft = Offset(dmgX - 4f * scaleX, dmgY - 2f * scaleY),
+                        size = Size(46f * scaleX, 22f * scaleY)
+                    )
+                    drawRect(
+                        color = RetroYellow,
+                        topLeft = Offset(dmgX - 4f * scaleX, dmgY - 2f * scaleY),
+                        size = Size(46f * scaleX, 22f * scaleY),
+                        style = Stroke(width = 2f * scaleX)
+                    )
+                    // Digits block representation
+                    drawRect(
+                        color = RetroRed,
+                        topLeft = Offset(dmgX + 4f * scaleX, dmgY + 6f * scaleY),
+                        size = Size(34f * scaleX, 10f * scaleY)
+                    )
+                }
             }
 
             // Undertale Arena Box (x=220, y=185, w=200, h=155)

@@ -1,6 +1,7 @@
 package com.example.viewmodel
 
 import android.app.Application
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.audio.RetroSoundEngine
@@ -9,6 +10,7 @@ import com.example.model.BattleState
 import com.example.model.Bullet
 import com.example.model.DialogueLine
 import com.example.model.DoorAction
+import com.example.model.DustParticle
 import com.example.model.GameChoice
 import com.example.model.GameMode
 import com.example.model.OrderlyState
@@ -25,6 +27,7 @@ import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.random.Random
 
 data class UiState(
     val mode: GameMode = GameMode.CUTSCENE_DRAG,
@@ -34,8 +37,9 @@ data class UiState(
     val isMuted: Boolean = false,
     val isDruggedMode: Boolean = false,
     val screenShakeTick: Int = 0,
+    val screenShakeIntensity: Float = 0f,
     val doorActionHistory: List<DoorAction> = emptyList(),
-    val doorOpen: Boolean = false,
+    val doorOpen: Boolean = true, // Open initially during drag cutscene!
     val orderlyAtWindow: Boolean = false,
     val orderlyInside: Boolean = false,
     val isVegetable: Boolean = false,
@@ -53,6 +57,7 @@ data class UiState(
     val orderly2: OrderlyState = OrderlyState(x = 345f, y = 330f, hasCoat = true),
     val orderly2Visible: Boolean = false,
     val battle: BattleState = BattleState(),
+    val dustParticles: List<DustParticle> = emptyList(),
     val tick: Long = 0L,
     val showHintsModal: Boolean = false
 )
@@ -77,6 +82,10 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
     private var dialogueQueue: MutableList<DialogueLine> = mutableListOf()
     private var currentDialogueLine: DialogueLine? = null
     private var onDialogueFinished: (() -> Unit)? = null
+
+    // Scripted Orderly Entry cutscene step counter
+    private var orderlyEnterStep = 0
+    private var orderlyEnterTimer = 0
 
     // Input directional flags
     var inputUp = false
@@ -109,8 +118,33 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
         _uiState.update { it.copy(showHintsModal = !it.showHintsModal) }
     }
 
-    fun triggerScreenShake() {
-        _uiState.update { it.copy(screenShakeTick = 15) }
+    fun triggerScreenShake(duration: Int = 18, intensity: Float = 14f) {
+        _uiState.update {
+            it.copy(screenShakeTick = duration, screenShakeIntensity = intensity)
+        }
+    }
+
+    private fun spawnDoorDustParticles() {
+        val particles = mutableListOf<DustParticle>()
+        val colors = listOf(Color.White, Color(0xFFFFD54F), Color(0xFFB0BEC5), Color(0xFFFFCC80))
+        for (i in 0 until 24) {
+            val px = 320f + Random.nextInt(-35, 36).toFloat()
+            val py = 308f + Random.nextInt(-4, 5).toFloat()
+            val vx = Random.nextDouble(-3.8, 3.8).toFloat()
+            val vy = Random.nextDouble(-4.5, -1.0).toFloat()
+            particles.add(
+                DustParticle(
+                    x = px,
+                    y = py,
+                    vx = vx,
+                    vy = vy,
+                    alpha = 1f,
+                    size = Random.nextInt(2, 5).toFloat(),
+                    color = colors[Random.nextInt(colors.size)]
+                )
+            )
+        }
+        _uiState.update { it.copy(dustParticles = it.dustParticles + particles) }
     }
 
     /* ==========================================
@@ -120,6 +154,7 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
         typingJob?.cancel()
         dialogueQueue.clear()
         onDialogueFinished = null
+        orderlyEnterStep = 0
 
         _uiState.update {
             it.copy(
@@ -127,7 +162,7 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
                 playerHP = 20,
                 isDruggedMode = false,
                 doorActionHistory = emptyList(),
-                doorOpen = false,
+                doorOpen = true, // Door is OPEN during drag
                 orderlyAtWindow = false,
                 orderlyInside = false,
                 isVegetable = false,
@@ -146,6 +181,7 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
         typingJob?.cancel()
         dialogueQueue.clear()
         onDialogueFinished = null
+        orderlyEnterStep = 0
 
         _uiState.update {
             it.copy(
@@ -171,6 +207,9 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
     }
 
     private fun startIntroCutscene() {
+        // Door is open while orderlies drag player inside
+        _uiState.update { it.copy(doorOpen = true) }
+
         startDialogue(
             listOf(
                 DialogueLine(
@@ -187,18 +226,6 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
                 )
             )
         ) {
-            soundEngine.sfxBangDoor()
-            triggerScreenShake()
-
-            _uiState.update {
-                it.copy(
-                    doorOpen = false,
-                    orderly2Visible = false,
-                    player = it.player.copy(x = 306f, y = 200f, dir = "down"),
-                    orderly = it.orderly.copy(y = 340f, state = "outside")
-                )
-            }
-
             startDialogue(
                 listOf(
                     DialogueLine(
@@ -211,10 +238,23 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
                         name = "",
                         portrait = null,
                         voice = "narrator",
-                        text = "* ЛЯЗГ! Тяжёлая стальная дверь захлопнулась на засов. Вокруг вас только мягкие белые стены."
+                        text = "* ЛЯЗГ! Стальная дверь захлопнулась на тяжелый засов. Вокруг вас только мягкие белые стены."
                     )
                 )
             ) {
+                // When slammed shut: sound, screen shake, dust sparks, door closed!
+                soundEngine.sfxBangDoor()
+                triggerScreenShake(duration = 26, intensity = 22f)
+                spawnDoorDustParticles()
+
+                _uiState.update {
+                    it.copy(
+                        doorOpen = false,
+                        orderly2Visible = false,
+                        player = it.player.copy(x = 306f, y = 200f, dir = "down"),
+                        orderly = it.orderly.copy(y = 340f, state = "outside")
+                    )
+                }
                 skipToCell()
             }
         }
@@ -336,7 +376,7 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
         }
 
         if (state.isTyping && currentDialogueLine != null) {
-            // Skip typing to instant display
+            // Instant text display
             typingJob?.cancel()
             _uiState.update {
                 it.copy(
@@ -407,7 +447,7 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
                         )
                     )
                 ) {
-                    triggerOrderlyEntersRoom()
+                    startScriptedOrderlyEntrance()
                 }
             }
             "ORDERLY_HEALTHY" -> {
@@ -457,7 +497,11 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
             "ACT_SHOELACE" -> {
                 _uiState.update {
                     it.copy(
-                        battle = it.battle.copy(phase = BattlePhase.ENEMY_DIALOGUE, enemyDefDown = true)
+                        battle = it.battle.copy(
+                            phase = BattlePhase.ENEMY_DIALOGUE,
+                            enemyDefDown = true,
+                            bossEmotion = "shock"
+                        )
                     )
                 }
                 startDialogue(
@@ -527,6 +571,7 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
             }
         }
 
+        // Pillow in corner
         if (px < 195f && py < 145f) {
             startDialogue(
                 listOf(
@@ -540,13 +585,14 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
             return
         }
 
-        if (abs(px - 440f) < 50f && py < 130f) {
+        // Requirement 2: Scratched Cipher Wall Hint on top-right wall
+        if (px > 400f && py < 140f) {
             startDialogue(
                 listOf(
                     DialogueLine(
-                        name = "",
+                        name = "ШИФР ПАЦИЕНТА #0",
                         portrait = null,
-                        text = "* На мягкой обивке кто-то нацарапал ногтем: «НЕ ТАРАБАНЬ И НЕ ОРИ ПО СХЕМЕ: Т - О - Т - Т - О... ИНАЧЕ ОВОЩ!»"
+                        text = "* На обшивке стены кто-то нацарапал ногтями странный шифр пациента №0: \"РЕЦЕПТ ВЕЧНОГО СПОКОЙСТВИЯ: Ударь. Закричи. Дважды ударь. И снова закричи у самой двери...\""
                     )
                 )
             )
@@ -616,7 +662,8 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
 
         if (action == DoorAction.BANG) {
             soundEngine.sfxBangDoor()
-            triggerScreenShake()
+            triggerScreenShake(duration = 16, intensity = 14f)
+            spawnDoorDustParticles()
 
             var text = "* БАМ! БАМ! Вы яростно буяните и колотите ногами по стальной двери!"
             if (matchedSteps == 1) text += " За дверью послышалось недовольное ворчание санитаров (Комбо 1/5)."
@@ -637,7 +684,7 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
             }
         } else if (action == DoorAction.SCREAM) {
             soundEngine.sfxScream()
-            triggerScreenShake()
+            triggerScreenShake(duration = 14, intensity = 12f)
 
             var text = "* «Я НЕ ПСИХ!! ВЫПУСТИТЕ МЕНЯ НЕМЕДЛЕННО, Я АБСОЛЮТНО НОРМАЛЬНЫЙ!!»"
             if (matchedSteps == 2) text += " Санитар за дверью: «Слышь, Петрович, он опять буянит...» (Комбо 2/5)."
@@ -669,40 +716,115 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
         )
     }
 
-    private fun triggerOrderlyEntersRoom() {
+    /* ==========================================
+       REQUIREMENT 4: SMOOTH SCRIPTED ORDERLY ENTRY
+       ========================================== */
+    private fun startScriptedOrderlyEntrance() {
         soundEngine.sfxDoorOpen()
+        triggerScreenShake(duration = 10, intensity = 8f)
+
+        orderlyEnterStep = 1
+        orderlyEnterTimer = 0
+
         _uiState.update {
             it.copy(
+                mode = GameMode.CUTSCENE_ORDERLY_ENTER,
                 doorOpen = true,
                 orderlyAtWindow = false,
                 orderlyInside = true,
-                player = it.player.copy(x = 306f, y = 175f, dir = "down"),
-                orderly = it.orderly.copy(x = 304f, y = 245f, state = "entering", hasCoat = true)
-            )
-        }
-
-        startDialogue(
-            listOf(
-                DialogueLine(
-                    name = "",
-                    portrait = null,
-                    text = "* ЩЁЛК! Санитар Михалыч отпирает замок, заходит в мягкую камеру и начинает хлопать себя по карманам халата..."
-                ),
-                DialogueLine(
-                    name = "САНИТАР МИХАЛЫЧ",
-                    portrait = "orderly_angry",
-                    voice = "orderly",
-                    text = "* Погоди-ка... Вот же мой телефон, во внутреннем кармане лежит! Ах ты ж хитрый симулянт, обмануть меня вздумал?!"
-                ),
-                DialogueLine(
-                    name = "САНИТАР МИХАЛЫЧ",
-                    portrait = "orderly_angry",
-                    voice = "orderly",
-                    text = "* Ну всё, щас ты у меня получишь лечебных люлей!"
+                orderly = it.orderly.copy(
+                    x = 304f,
+                    y = 330f,
+                    dir = "up",
+                    state = "entering",
+                    hasCoat = true,
+                    bubbleSymbol = null
                 )
             )
-        ) {
-            startOrderlyBattle()
+        }
+    }
+
+    private fun updateScriptedOrderlyEntry() {
+        orderlyEnterTimer++
+        val current = _uiState.value
+
+        when (orderlyEnterStep) {
+            1 -> {
+                // Player backs up towards upper center of room
+                var py = current.player.y
+                val targetPy = 150f
+                if (py > targetPy) {
+                    py = (py - 1.6f).coerceAtLeast(targetPy)
+                    val frame = ((orderlyEnterTimer / 8) % 4)
+                    _uiState.update {
+                        it.copy(player = it.player.copy(y = py, dir = "up", animFrame = frame, moving = true))
+                    }
+                } else {
+                    _uiState.update {
+                        it.copy(player = it.player.copy(moving = false, dir = "down"))
+                    }
+                    orderlyEnterStep = 2
+                    orderlyEnterTimer = 0
+                }
+            }
+            2 -> {
+                // Mihalych steps through the doorway from y = 330 down to y = 220
+                var oy = current.orderly.y
+                val targetOy = 220f
+                if (oy > targetOy) {
+                    oy = (oy - 1.8f).coerceAtLeast(targetOy)
+                    val frame = ((orderlyEnterTimer / 7) % 4)
+                    _uiState.update {
+                        it.copy(orderly = it.orderly.copy(y = oy, dir = "up", animFrame = frame))
+                    }
+                } else {
+                    orderlyEnterStep = 3
+                    orderlyEnterTimer = 0
+                }
+            }
+            3 -> {
+                // Mihalych looks around, "?" bubble appears above his head
+                val lookPhase = orderlyEnterTimer / 25
+                val dir = if (lookPhase % 2 == 0) "left" else "right"
+                _uiState.update {
+                    it.copy(orderly = it.orderly.copy(dir = dir, bubbleSymbol = "?"))
+                }
+                if (orderlyEnterTimer > 60) {
+                    orderlyEnterStep = 4
+                    orderlyEnterTimer = 0
+                }
+            }
+            4 -> {
+                // Mihalych pats pocket, "!" bubble appears
+                _uiState.update {
+                    it.copy(orderly = it.orderly.copy(dir = "up", bubbleSymbol = "!"))
+                }
+                if (orderlyEnterTimer > 40) {
+                    orderlyEnterStep = 5
+                    _uiState.update {
+                        it.copy(orderly = it.orderly.copy(bubbleSymbol = null))
+                    }
+                    // Trigger angry dialogue
+                    startDialogue(
+                        listOf(
+                            DialogueLine(
+                                name = "САНИТАР МИХАЛЫЧ",
+                                portrait = "orderly_angry",
+                                voice = "orderly",
+                                text = "* Погоди-ка... Вот же мой телефон, во внутреннем кармане лежит! Ах ты ж хитрый симулянт, обмануть меня вздумал?!"
+                            ),
+                            DialogueLine(
+                                name = "САНИТАР МИХАЛЫЧ",
+                                portrait = "orderly_angry",
+                                voice = "orderly",
+                                text = "* Ну всё, щас ты у меня получишь лечебных люлей!"
+                            )
+                        )
+                    ) {
+                        startOrderlyBattle()
+                    }
+                }
+            }
         }
     }
 
@@ -717,7 +839,8 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
                 battle = BattleState(
                     phase = BattlePhase.INTRO_FLASH,
                     enemyHP = 100,
-                    pillsLeft = 2
+                    pillsLeft = 2,
+                    bossEmotion = "normal"
                 )
             )
         }
@@ -731,16 +854,19 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
         val pills = _uiState.value.battle.pillsLeft
         _uiState.update {
             it.copy(
-                battle = it.battle.copy(phase = BattlePhase.MENU)
+                battle = it.battle.copy(
+                    phase = BattlePhase.MENU,
+                    bossEmotion = if (it.battle.enemyDefDown) "shock" else "normal"
+                )
             )
         }
         showChoices(
             prompt = flavorText,
             portrait = "orderly_angry",
             choices = listOf(
-                GameChoice("BATTLE_FIGHT", "⚔ БИТВА (Атаковать)"),
-                GameChoice("BATTLE_ACT", "🔊 ДЕЙСТВИЕ (Хитрость)"),
-                GameChoice("BATTLE_ITEM", "💊 ВЕЩИ (Валерьянка x$pills)"),
+                GameChoice("BATTLE_FIGHT", "⚔ БИТВА"),
+                GameChoice("BATTLE_ACT", "🔊 ДЕЙСТВИЕ"),
+                GameChoice("BATTLE_ITEM", "💊 ВЕЩИ (x$pills)"),
                 GameChoice("BATTLE_SPARE", "✖ ПОЩАДА")
             )
         )
@@ -814,7 +940,7 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
                 choices = emptyList(),
                 currentSpeaker = "ПРИЦЕЛ АТАКИ",
                 currentPortrait = null,
-                displayedDialogueText = "* Нажмите [Z / ENTER / КНОПКУ Z], когда линия будет по центру шкалы!",
+                displayedDialogueText = "* Нажмите [Z / ENTER / КНОПКУ Z], когда белая линия будет в центре!",
                 canAdvanceDialogue = false
             )
         }
@@ -825,7 +951,7 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
         if (b.phase != BattlePhase.ATTACK_BAR) return
 
         soundEngine.sfxSlash()
-        triggerScreenShake()
+        triggerScreenShake(duration = 18, intensity = 15f)
 
         val dist = abs(b.barCursor - 0.5f)
         var dmg = ((1f - dist * 1.4f) * 38f).toInt()
@@ -842,8 +968,14 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
                     phase = BattlePhase.SLASH_ANIM,
                     enemyHP = newEnemyHP,
                     lastDamage = dmg,
-                    enemyShake = 20,
-                    slashTimer = 45,
+                    enemyShake = 22,
+                    slashTimer = 48,
+                    slashProgress = 0f,
+                    bossEmotion = "hurt",
+                    damageText = "-$dmg",
+                    damageTextY = 0f,
+                    damageTextVy = -7.5f,
+                    damageVisible = true,
                     enemyDefDown = false
                 ),
                 displayedDialogueText = "* ВЫ НАНОСИТЕ УДАР! -$dmg ОЗ у санитара!"
@@ -867,7 +999,7 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
         val taunt = taunts[(turn - 1) % taunts.size]
 
         _uiState.update {
-            it.copy(battle = b.copy(phase = BattlePhase.ENEMY_DIALOGUE, turnCount = turn))
+            it.copy(battle = b.copy(phase = BattlePhase.ENEMY_DIALOGUE, turnCount = turn, bossEmotion = "normal"))
         }
 
         startDialogue(
@@ -924,7 +1056,7 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
 
     private fun triggerDoctorCoatEnding() {
         soundEngine.sfxBangDoor()
-        triggerScreenShake()
+        triggerScreenShake(duration = 20, intensity = 16f)
 
         _uiState.update {
             it.copy(
@@ -987,7 +1119,7 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
 
     private fun triggerVegetableSecretEnding() {
         soundEngine.sfxScream()
-        triggerScreenShake()
+        triggerScreenShake(duration = 20, intensity = 18f)
 
         _uiState.update {
             it.copy(
@@ -1122,22 +1254,46 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
     private fun updateTick() {
         val current = _uiState.value
         val newTick = current.tick + 1
-        var newShake = if (current.screenShakeTick > 0) current.screenShakeTick - 1 else 0
+        val newShake = if (current.screenShakeTick > 0) current.screenShakeTick - 1 else 0
+
+        // Update dust particles
+        val updatedDust = current.dustParticles.mapNotNull { p ->
+            p.x += p.vx
+            p.y += p.vy
+            p.vy += 0.15f // gravity
+            p.alpha -= 0.035f
+            if (p.alpha > 0f) p else null
+        }
+
+        if (current.mode == GameMode.CUTSCENE_ORDERLY_ENTER) {
+            updateScriptedOrderlyEntry()
+            _uiState.update {
+                it.copy(tick = newTick, screenShakeTick = newShake, dustParticles = updatedDust)
+            }
+            return
+        }
 
         if (current.mode == GameMode.BATTLE) {
-            updateBattleTick(current, newTick, newShake)
+            updateBattleTick(current, newTick, newShake, updatedDust)
             return
         }
 
         // Overworld movement
         if (current.mode == GameMode.EXPLORE || current.mode == GameMode.ORDERLY_SEARCH) {
-            updatePlayerMovement(current, newTick, newShake)
+            updatePlayerMovement(current, newTick, newShake, updatedDust)
         } else {
-            _uiState.update { it.copy(tick = newTick, screenShakeTick = newShake) }
+            _uiState.update {
+                it.copy(tick = newTick, screenShakeTick = newShake, dustParticles = updatedDust)
+            }
         }
     }
 
-    private fun updatePlayerMovement(current: UiState, newTick: Long, newShake: Int) {
+    private fun updatePlayerMovement(
+        current: UiState,
+        newTick: Long,
+        newShake: Int,
+        dust: List<DustParticle>
+    ) {
         var dx = 0f
         var dy = 0f
         var dir = current.player.dir
@@ -1149,8 +1305,10 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
 
         val moving = dx != 0f || dy != 0f
         var animFrame = current.player.animFrame
-        if (moving && newTick % 8 == 0L) {
-            animFrame = (animFrame + 1) % 2
+        if (moving && newTick % 7 == 0L) {
+            animFrame = (animFrame + 1) % 4
+        } else if (!moving) {
+            animFrame = 0
         }
 
         var nx = current.player.x + dx
@@ -1179,7 +1337,7 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
                 "[Z / ДЕЙСТВИЕ] — САНИТАР МИХАЛЫЧ"
             }
             px < 195f && py < 145f -> "[Z / ДЕЙСТВИЕ] — ОСМОТРЕТЬ ПОДУШКУ"
-            abs(px - 440f) < 50f && py < 130f -> "[Z / ДЕЙСТВИЕ] — НАДПИСЬ НА СТЕНЕ"
+            px > 400f && py < 140f -> "[Z / ДЕЙСТВИЕ] — ШИФР НА СТЕНЕ"
             else -> null
         }
 
@@ -1190,9 +1348,11 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
             val ody = current.orderly.targetY - current.orderly.y
             val dist = kotlin.math.hypot(odx, ody)
             if (dist > 4f) {
+                val oFrame = ((newTick / 8) % 4).toInt()
                 newOrderly = newOrderly.copy(
                     x = newOrderly.x + (odx / dist) * 1.5f,
-                    y = newOrderly.y + (ody / dist) * 1.5f
+                    y = newOrderly.y + (ody / dist) * 1.5f,
+                    animFrame = oFrame
                 )
             } else {
                 val timer = newOrderly.searchTimer + 1
@@ -1202,7 +1362,8 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
                     newOrderly = newOrderly.copy(
                         searchTimer = 0,
                         targetX = pick.first,
-                        targetY = pick.second
+                        targetY = pick.second,
+                        animFrame = 0
                     )
                 } else {
                     newOrderly = newOrderly.copy(searchTimer = timer)
@@ -1214,6 +1375,7 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
             it.copy(
                 tick = newTick,
                 screenShakeTick = newShake,
+                dustParticles = dust,
                 interactPrompt = hint,
                 player = it.player.copy(x = nx, y = ny, dir = dir, moving = moving, animFrame = animFrame),
                 orderly = newOrderly
@@ -1221,7 +1383,12 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    private fun updateBattleTick(current: UiState, newTick: Long, newShake: Int) {
+    private fun updateBattleTick(
+        current: UiState,
+        newTick: Long,
+        newShake: Int,
+        dust: List<DustParticle>
+    ) {
         val b = current.battle
 
         // Attack timing bar update
@@ -1239,15 +1406,28 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
                 it.copy(
                     tick = newTick,
                     screenShakeTick = newShake,
+                    dustParticles = dust,
                     battle = b.copy(barCursor = cursor, barDir = dir)
                 )
             }
             return
         }
 
-        // Slash animation update
+        // Slash animation & damage number jump physics update
         if (b.phase == BattlePhase.SLASH_ANIM) {
             val timer = b.slashTimer - 1
+
+            // Curved slash progress 0f to 1f
+            val slashP = (48 - timer) / 48f
+
+            // Damage text jump physics
+            var dY = b.damageTextY + b.damageTextVy
+            var dVy = b.damageTextVy + 0.5f // gravity
+            if (dY > 20f) {
+                dY = 20f
+                dVy = 0f
+            }
+
             if (timer <= 0) {
                 if (b.enemyHP <= 0) {
                     triggerBattleVictory()
@@ -1259,7 +1439,14 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
                     it.copy(
                         tick = newTick,
                         screenShakeTick = newShake,
-                        battle = b.copy(slashTimer = timer, enemyShake = if (b.enemyShake > 0) b.enemyShake - 1 else 0)
+                        dustParticles = dust,
+                        battle = b.copy(
+                            slashTimer = timer,
+                            slashProgress = slashP,
+                            enemyShake = if (b.enemyShake > 0) b.enemyShake - 1 else 0,
+                            damageTextY = dY,
+                            damageTextVy = dVy
+                        )
                     )
                 }
             }
@@ -1363,7 +1550,7 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
                     bul.y + bul.h > sy + 2f
                 ) {
                     soundEngine.sfxDamage()
-                    triggerScreenShake()
+                    triggerScreenShake(duration = 16, intensity = 14f)
                     newSoulInvuln = 45
                     playerHp = (playerHp - 4).coerceAtLeast(0)
                 }
@@ -1405,6 +1592,7 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
                     it.copy(
                         tick = newTick,
                         screenShakeTick = newShake,
+                        dustParticles = dust,
                         playerHP = playerHp,
                         battle = b.copy(
                             soulX = sx,
@@ -1419,6 +1607,8 @@ class DurotaleViewModel(application: Application) : AndroidViewModel(application
             return
         }
 
-        _uiState.update { it.copy(tick = newTick, screenShakeTick = newShake) }
+        _uiState.update {
+            it.copy(tick = newTick, screenShakeTick = newShake, dustParticles = dust)
+        }
     }
 }

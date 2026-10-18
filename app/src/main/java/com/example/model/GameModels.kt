@@ -1,11 +1,14 @@
 package com.example.model
 
+import androidx.compose.ui.graphics.Color
+
 enum class GameMode {
     CUTSCENE_DRAG,
     EXPLORE,
     ORDERLY_SEARCH,
     DIALOGUE,
     CHOICE,
+    CUTSCENE_ORDERLY_ENTER,
     BATTLE,
     POST_BATTLE_CUTSCENE,
     ENDING_VEGETABLE,
@@ -15,6 +18,7 @@ enum class GameMode {
 enum class BattlePhase {
     INTRO_FLASH,
     MENU,
+    ACT_MENU,
     ATTACK_BAR,
     SLASH_ANIM,
     ENEMY_DIALOGUE,
@@ -42,6 +46,16 @@ data class GameChoice(
     val label: String
 )
 
+data class DustParticle(
+    var x: Float,
+    var y: Float,
+    var vx: Float,
+    var vy: Float,
+    var alpha: Float = 1f,
+    val size: Float = 3f,
+    val color: Color = Color(0xFFFFD54F)
+)
+
 data class Bullet(
     var x: Float,
     var y: Float,
@@ -60,7 +74,7 @@ data class PlayerState(
     val speed: Float = 3.2f,
     var dir: String = "down",
     var moving: Boolean = false,
-    var animFrame: Int = 0,
+    var animFrame: Int = 0, // 0..3
     var hasCoat: Boolean = false
 )
 
@@ -74,7 +88,9 @@ data class OrderlyState(
     var searchTimer: Int = 0,
     var targetX: Float = 220f,
     var targetY: Float = 165f,
-    var hasCoat: Boolean = true
+    var hasCoat: Boolean = true,
+    var animFrame: Int = 0,
+    var bubbleSymbol: String? = null // "?", "!"
 )
 
 data class BattleState(
@@ -86,6 +102,7 @@ data class BattleState(
     var enemyShake: Int = 0,
     var lastDamage: Int = 0,
     var slashTimer: Int = 0,
+    var slashProgress: Float = 0f,
     var barCursor: Float = 0f,
     var barDir: Float = 1f,
     var pillsLeft: Int = 2,
@@ -95,5 +112,10 @@ data class BattleState(
     val soulSpeed: Float = 3.4f,
     var soulInvuln: Int = 0,
     var waveTimer: Int = 270,
-    val bullets: MutableList<Bullet> = mutableListOf()
+    val bullets: MutableList<Bullet> = mutableListOf(),
+    var bossEmotion: String = "normal", // "normal", "shock", "hurt"
+    var damageText: String? = null,
+    var damageTextY: Float = 0f,
+    var damageTextVy: Float = 0f,
+    var damageVisible: Boolean = false
 )

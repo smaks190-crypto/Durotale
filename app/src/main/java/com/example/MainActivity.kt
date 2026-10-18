@@ -203,6 +203,9 @@ fun DurotaleGameScreen(
                         orderlyAtWindow = state.orderlyAtWindow,
                         orderlyInside = state.orderlyInside,
                         isVegetable = state.isVegetable,
+                        dustParticles = state.dustParticles,
+                        screenShakeTick = state.screenShakeTick,
+                        screenShakeIntensity = state.screenShakeIntensity,
                         interactPrompt = state.interactPrompt,
                         tick = state.tick
                     )
