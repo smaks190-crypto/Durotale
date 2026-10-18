@@ -7,7 +7,7 @@ import org.robolectric.annotation.Config
 import org.junit.Assert.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36])
+@Config(sdk = [34])
 class ExampleRobolectricTest {
 
     @Test

@@ -1,0 +1,2489 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>DUROTALE — Побег из Дурки</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --ut-white: #ffffff;
+            --ut-black: #000000;
+            --ut-yellow: #ffff00;
+            --ut-red: #ff0000;
+            --ut-gray: #888888;
+            --ut-orange: #ff7f27;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            image-rendering: pixelated;
+            touch-action: none;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            width: 100vw;
+            height: 100dvh;
+            background-color: #060609;
+            color: var(--ut-white);
+            font-family: 'Press Start 2P', monospace;
+        }
+
+        /* Landscape Container */
+        #app-root {
+            display: flex;
+            width: 100vw;
+            height: 100dvh;
+            overflow: hidden;
+            background: radial-gradient(circle at center, #101018 0%, #050508 100%);
+        }
+
+        /* CRT Scanlines Overlay */
+        .crt-scanlines {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(
+                rgba(18, 16, 16, 0) 50%, 
+                rgba(0, 0, 0, 0.3) 50%
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 99;
+        }
+
+        /* Undertale Classic Boxes */
+        .ut-box {
+            background-color: #000000;
+            border: 4px solid #ffffff;
+            box-shadow: 0 0 0 2px #000000, 0 8px 24px rgba(0, 0, 0, 0.9);
+        }
+
+        .ut-btn {
+            background-color: #000000;
+            border: 3px solid #ff7f27;
+            color: #ff7f27;
+            cursor: pointer;
+            transition: transform 0.08s;
+        }
+        .ut-btn:hover, .ut-btn.active {
+            border-color: #ffff00;
+            color: #ffff00;
+            transform: scale(1.03);
+        }
+
+        /* Screen shake */
+        @keyframes shakeKeyframe {
+            0%, 100% { transform: translate(0, 0); }
+            15% { transform: translate(-8px, 6px); }
+            30% { transform: translate(8px, -6px); }
+            45% { transform: translate(-6px, -4px); }
+            60% { transform: translate(6px, 5px); }
+            75% { transform: translate(-3px, 2px); }
+            90% { transform: translate(2px, -2px); }
+        }
+
+        .shake-active {
+            animation: shakeKeyframe 0.32s ease-in-out;
+        }
+
+        /* Psychedelic Drugged Vegetable Ending */
+        @keyframes druggedEffect {
+            0% { filter: hue-rotate(0deg) blur(0px); transform: scale(1); }
+            50% { filter: hue-rotate(150deg) blur(2px); transform: scale(1.02) skewX(2deg); }
+            100% { filter: hue-rotate(360deg) blur(0px); transform: scale(1); }
+        }
+
+        .drugged-mode {
+            animation: druggedEffect 3.5s infinite ease-in-out;
+        }
+
+        /* Arcade buttons */
+        .arcade-btn {
+            box-shadow: 0 6px 0 rgba(0,0,0,0.8), 0 0 15px rgba(255,255,255,0.1);
+            transition: transform 0.06s, box-shadow 0.06s;
+            cursor: pointer;
+        }
+        .arcade-btn:active, .arcade-btn.pressed {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 rgba(0,0,0,0.9);
+        }
+
+        /* Custom scrollbar in modal */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #ffffff;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="crt-scanlines"></div>
+
+    <div id="app-root" class="relative select-none flex flex-row items-center justify-between p-2 gap-2">
+
+        <!-- ==========================================
+             LEFT PANEL: STATUS & VIRTUAL JOYSTICK
+             ========================================== -->
+        <aside class="w-[200px] shrink-0 h-full flex flex-col justify-between py-1 z-20">
+            <!-- Patient Stats Card -->
+            <div class="ut-box p-2 rounded-sm text-[9px] leading-relaxed flex flex-col gap-1.5 bg-black/90">
+                <div class="flex items-center justify-between text-yellow-400 font-bold">
+                    <span>ПАЦИЕНТ #404</span>
+                    <span class="text-zinc-400">УР 1</span>
+                </div>
+
+                <div class="flex items-center gap-1.5">
+                    <span class="text-red-400 font-bold">ОЗ</span>
+                    <div class="flex-1 h-3.5 bg-red-800 border-2 border-white relative">
+                        <div id="hp-bar" class="h-full bg-yellow-400 transition-all duration-200" style="width: 100%;"></div>
+                    </div>
+                    <span id="hp-text" class="text-[8px] text-zinc-300">20/20</span>
+                </div>
+
+                <div class="flex items-center justify-between pt-1 border-t border-zinc-800 text-[8px]">
+                    <span id="endings-badge" class="text-emerald-400 font-bold">КОНЦОВКИ: 0/2</span>
+                    <button id="btn-sound" onclick="toggleMute()" class="px-1.5 py-0.5 border border-white hover:border-yellow-400 hover:text-yellow-400 transition" title="Звук Вкл/Выкл">
+                        🔊
+                    </button>
+                </div>
+
+                <!-- Door noise combo indicators -->
+                <div id="combo-hud" class="hidden flex flex-col gap-0.5 pt-1 border-t border-zinc-800">
+                    <span class="text-zinc-500 text-[7px]">КОМБО ДВЕРИ:</span>
+                    <div id="combo-badges" class="flex flex-wrap gap-1 text-[7px]"></div>
+                </div>
+            </div>
+
+            <!-- Virtual Analog Joystick -->
+            <div class="flex flex-col items-center justify-center my-auto">
+                <div class="text-[8px] text-zinc-400 mb-1 tracking-widest text-center">ДЖОЙСТИК</div>
+                <div id="joystick-base" class="relative w-36 h-36 rounded-full bg-zinc-950 border-4 border-zinc-600 shadow-2xl flex items-center justify-center touch-none">
+                    <!-- Concentric circles -->
+                    <div class="absolute w-24 h-24 rounded-full border border-zinc-800 pointer-events-none"></div>
+                    <div class="absolute w-12 h-12 rounded-full border border-zinc-700 pointer-events-none"></div>
+                    <!-- Cross lines -->
+                    <div class="absolute w-full h-[1px] bg-zinc-800 pointer-events-none"></div>
+                    <div class="absolute h-full w-[1px] bg-zinc-800 pointer-events-none"></div>
+                    <!-- Knob -->
+                    <div id="joystick-knob" class="absolute w-14 h-14 rounded-full bg-gradient-to-b from-zinc-700 to-zinc-900 border-2 border-yellow-400 shadow-lg pointer-events-none flex items-center justify-center">
+                        <div class="w-5 h-5 rounded-full bg-yellow-400/30 border border-yellow-400"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hint modal toggle & Reset -->
+            <div class="flex gap-1.5 text-[8px]">
+                <button onclick="toggleHintModal()" class="flex-1 ut-btn p-1.5 text-center rounded-sm">
+                    ? ПАМЯТКА
+                </button>
+                <button onclick="skipToCell()" class="ut-btn p-1.5 text-center rounded-sm" title="Вернуться в камеру">
+                    ↺ СБРОС
+                </button>
+            </div>
+        </aside>
+
+        <!-- ==========================================
+             CENTER PANEL: GAME CANVAS & DIALOGUE
+             ========================================== -->
+        <main class="flex-1 h-full flex flex-col items-center justify-between z-10 max-w-[700px]">
+            <!-- Canvas Container -->
+            <div id="canvas-wrapper" class="ut-box w-full aspect-[16/9] max-h-[58dvh] relative overflow-hidden bg-black rounded-sm flex items-center justify-center">
+                <canvas id="gameCanvas" width="640" height="360" class="w-full h-full object-contain"></canvas>
+
+                <!-- Interactive action prompt -->
+                <div id="interact-hint" class="hidden absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/95 border-2 border-yellow-400 text-yellow-300 px-3 py-1 rounded text-[9px] animate-bounce pointer-events-none">
+                    [Z] ДЕЙСТВИЕ
+                </div>
+            </div>
+
+            <!-- Dialogue & Choice Box (Undertale Style) -->
+            <div id="dialogue-box" class="ut-box w-full min-h-[140px] max-h-[38dvh] p-2.5 flex flex-col justify-between relative rounded-sm bg-black">
+                <div class="flex items-start gap-2.5 h-full">
+                    <!-- 64x64 Portrait Canvas -->
+                    <div id="portrait-frame" class="shrink-0 w-16 h-16 border-2 border-white bg-zinc-950 flex items-center justify-center">
+                        <canvas id="portraitCanvas" width="64" height="64" class="w-full h-full"></canvas>
+                    </div>
+
+                    <!-- Text & Choices content -->
+                    <div class="flex-1 flex flex-col justify-between h-full overflow-hidden">
+                        <div class="flex justify-between items-center pb-1 mb-1 border-b border-zinc-800">
+                            <span id="speaker-name" class="text-yellow-400 text-[10px] font-bold"></span>
+                            <span id="dialogue-next-hint" class="text-zinc-500 text-[8px] animate-pulse hidden">[Z] ДАЛЕЕ ▼</span>
+                        </div>
+
+                        <div id="dialogue-text" class="text-[10px] sm:text-[11px] leading-relaxed tracking-wider text-white min-h-[44px]">
+                            * Вы заперты в мягкой одиночной камере №6.
+                        </div>
+
+                        <!-- Undertale choices grid -->
+                        <div id="choices-container" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-x-2 gap-y-1.5 pt-1 text-[9px] border-t border-zinc-800">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- ==========================================
+             RIGHT PANEL: ACTION BUTTONS (Z / X) & FULLSCREEN
+             ========================================== -->
+        <aside class="w-[140px] shrink-0 h-full flex flex-col justify-between items-center py-2 z-20">
+            <!-- Fullscreen toggle -->
+            <button onclick="toggleFullscreen()" class="ut-btn px-2.5 py-1 text-[8px] rounded-sm w-full text-center" title="Развернуть во весь экран">
+                ⛶ ЭКРАН
+            </button>
+
+            <!-- Action buttons container -->
+            <div class="flex flex-col items-center gap-5 my-auto">
+                <!-- Button X (Skip / Cancel) -->
+                <div class="flex flex-col items-center">
+                    <button id="btn-x" onpointerdown="triggerButton('X', true)" onpointerup="triggerButton('X', false)" onpointerleave="triggerButton('X', false)"
+                        class="arcade-btn w-16 h-16 rounded-full bg-gradient-to-b from-red-600 to-red-900 border-4 border-red-400 text-white font-bold text-lg flex items-center justify-center active:bg-red-800">
+                        X
+                    </button>
+                    <span class="text-[7px] text-zinc-400 mt-1">ПРОПУСК / Х</span>
+                </div>
+
+                <!-- Button Z (Confirm / Attack / Action) -->
+                <div class="flex flex-col items-center">
+                    <button id="btn-z" onpointerdown="triggerButton('Z', true)" onpointerup="triggerButton('Z', false)" onpointerleave="triggerButton('Z', false)"
+                        class="arcade-btn w-20 h-20 rounded-full bg-gradient-to-b from-yellow-400 to-amber-600 border-4 border-yellow-200 text-black font-black text-2xl flex items-center justify-center shadow-yellow-500/20 active:bg-yellow-500">
+                        Z
+                    </button>
+                    <span class="text-[8px] text-yellow-300 font-bold mt-1">ДЕЙСТВИЕ / Z</span>
+                </div>
+            </div>
+
+            <!-- Virtual Keyboard hint -->
+            <div class="text-[7px] text-zinc-500 text-center leading-tight">
+                WASD / СТРЕЛКИ<br>Z = ВЫБОР | X = СБРОС
+            </div>
+        </aside>
+
+    </div>
+
+    <!-- Walkthrough / Secrets Modal -->
+    <div id="hint-modal" class="hidden fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
+        <div class="ut-box max-w-lg w-full p-4 rounded-sm text-[10px] leading-relaxed">
+            <div class="flex justify-between items-center border-b-2 border-white pb-2 mb-3">
+                <span class="text-yellow-400 text-xs">★ ПАМЯТКА ПАЦИЕНТА #404</span>
+                <button onclick="toggleHintModal()" class="text-red-400 font-bold hover:text-red-300 text-xs">[ЗАКРЫТЬ]</button>
+            </div>
+
+            <div class="space-y-3 text-zinc-300 text-[9px]">
+                <div class="p-2 border border-emerald-500/60 bg-emerald-950/40 rounded">
+                    <div class="text-emerald-400 font-bold mb-1">1. КОНЦОВКА «КТО В ХАЛАТЕ — ТОТ И ВРАЧ»:</div>
+                    Подойди к стальной двери $\to$ <b>Постучать</b> $\to$ скажи Михалычу: <b>«Вы выронили телефон у меня в камере!»</b>. Когда санитар зайдет внутрь — начнется битва Undertale! Уворачивайся от шприцев и таблеток джойстиком, бей в тайминг по центру шкалы и отними его халат!
+                </div>
+
+                <div class="p-2 border border-purple-500/60 bg-purple-950/40 rounded">
+                    <div class="text-purple-400 font-bold mb-1">2. СЕКРЕТНАЯ КОНЦОВКА «ОВОЩ» (ШИФР НА СТЕНЕ):</div>
+                    Осмотри зашифрованные на стене римские цифры. Сделай у двери ровно такую комбинацию шума подряд:<br>
+                    <span class="text-yellow-300 font-bold">1) Тарабанить</span> $\to$
+                    <span class="text-yellow-300 font-bold">2) Орать</span> $\to$
+                    <span class="text-yellow-300 font-bold">3) Тарабанить</span> $\to$
+                    <span class="text-yellow-300 font-bold">4) Тарабанить</span> $\to$
+                    <span class="text-yellow-300 font-bold">5) Орать</span>.
+                </div>
+            </div>
+
+            <div class="mt-4 flex justify-end gap-2">
+                <button onclick="restartGame(); toggleHintModal();" class="ut-btn px-3 py-1.5 text-[8px] rounded">
+                    НАЧАТЬ КАТСЦЕНУ ЗАНОВО
+                </button>
+                <button onclick="toggleHintModal()" class="bg-white text-black px-4 py-1.5 text-[9px] font-bold rounded hover:bg-yellow-300">
+                    ПОНЯТНО
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         GAME SCRIPT: PIXEL ART, SOUND & MECHANICS
+         ========================================== -->
+    <script>
+        /* ==========================================
+           8-BIT WEB AUDIO SYNTHESIZER
+           ========================================== */
+        let audioCtx = null;
+        let isMuted = false;
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function toggleMute() {
+            isMuted = !isMuted;
+            document.getElementById('btn-sound').textContent = isMuted ? '🔇' : '🔊';
+        }
+
+        function playTone(freq, duration = 0.05, type = 'square', volume = 0.1, slideTo = null) {
+            if (isMuted) return;
+            try {
+                initAudio();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                if (slideTo) {
+                    osc.frequency.exponentialRampToValueAtTime(Math.max(10, slideTo), audioCtx.currentTime + duration);
+                }
+                gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch (e) {}
+        }
+
+        function playVoiceBlip(speaker) {
+            if (speaker === 'orderly') {
+                playTone(130 + Math.random() * 25, 0.045, 'sawtooth', 0.08);
+            } else if (speaker === 'player') {
+                playTone(360 + Math.random() * 40, 0.035, 'square', 0.07);
+            } else if (speaker === 'vegetable') {
+                playTone(90 + Math.random() * 15, 0.09, 'sine', 0.09);
+            } else {
+                playTone(260 + Math.random() * 25, 0.035, 'square', 0.06);
+            }
+        }
+
+        function sfxKnock() {
+            playTone(110, 0.08, 'triangle', 0.22, 55);
+            setTimeout(() => playTone(115, 0.08, 'triangle', 0.22, 55), 130);
+        }
+
+        function sfxDoorSlam() {
+            playTone(95, 0.22, 'sawtooth', 0.35, 30);
+            setTimeout(() => playTone(80, 0.25, 'square', 0.3, 25), 90);
+        }
+
+        function sfxScream() {
+            playTone(420, 0.25, 'sawtooth', 0.16, 680);
+            setTimeout(() => playTone(580, 0.25, 'sawtooth', 0.16, 310), 160);
+        }
+
+        function sfxDoorCreak() {
+            playTone(170, 0.15, 'square', 0.15, 260);
+            setTimeout(() => playTone(240, 0.2, 'square', 0.15, 340), 130);
+        }
+
+        function sfxBattleStart() {
+            playTone(520, 0.08, 'square', 0.2);
+            setTimeout(() => playTone(520, 0.08, 'square', 0.2), 110);
+            setTimeout(() => playTone(780, 0.25, 'sawtooth', 0.25, 220), 220);
+        }
+
+        function sfxSlash() {
+            playTone(700, 0.1, 'sawtooth', 0.25, 120);
+            setTimeout(() => playTone(150, 0.2, 'square', 0.3, 50), 80);
+        }
+
+        function sfxDamage() {
+            playTone(160, 0.15, 'sawtooth', 0.3, 50);
+        }
+
+        function sfxHeal() {
+            playTone(392, 0.09, 'sine', 0.15);
+            setTimeout(() => playTone(523.2, 0.12, 'sine', 0.15), 90);
+            setTimeout(() => playTone(659.2, 0.18, 'sine', 0.18), 180);
+        }
+
+        function sfxVictory() {
+            const notes = [261.6, 329.6, 392.0, 523.2];
+            notes.forEach((n, i) => {
+                setTimeout(() => playTone(n, 0.18, 'square', 0.12), i * 140);
+            });
+        }
+
+        function sfxSyringe() {
+            playTone(620, 0.45, 'sine', 0.2, 110);
+            setTimeout(() => playTone(220, 0.6, 'sawtooth', 0.18, 60), 380);
+        }
+
+        /* ==========================================
+           FULLSCREEN TOGGLE
+           ========================================== */
+        function toggleFullscreen() {
+            initAudio();
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(() => {});
+                if (screen.orientation && screen.orientation.lock) {
+                    screen.orientation.lock('landscape').catch(() => {});
+                }
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen();
+            }
+        }
+
+        /* ==========================================
+           PIXEL SPRITE MATRIX RENDERER
+           ========================================== */
+        // Universal function to render matrix sprite on any canvas context
+        function drawSpriteMatrix(targetCtx, matrix, palette, destX, destY, pixelSize = 2, flipX = false) {
+            targetCtx.save();
+            const h = matrix.length;
+            const w = matrix[0].length;
+
+            if (flipX) {
+                targetCtx.translate(destX + w * pixelSize, destY);
+                targetCtx.scale(-1, 1);
+            } else {
+                targetCtx.translate(destX, destY);
+            }
+
+            for (let r = 0; r < h; r++) {
+                const row = matrix[r];
+                for (let c = 0; c < row.length; c++) {
+                    const char = row[c];
+                    if (char !== '.' && palette[char]) {
+                        targetCtx.fillStyle = palette[char];
+                        targetCtx.fillRect(c * pixelSize, r * pixelSize, pixelSize, pixelSize);
+                    }
+                }
+            }
+            targetCtx.restore();
+        }
+
+        // Palette definitions
+        const PALETTES = {
+            player: {
+                'K': '#000000', // Outline
+                'H': '#5c3818', // Hair dark
+                'h': '#8a5828', // Hair light
+                'S': '#fcd0a1', // Skin
+                's': '#e0b080', // Skin shadow
+                'W': '#ffffff', // White jacket
+                'w': '#cdd5de', // Jacket shadow
+                'B': '#75808e', // Buckle / strap grey
+                'b': '#49525e', // Buckle dark
+                'P': '#2e3740', // Pants
+                'p': '#1c2228', // Pants shadow
+                'R': '#e53935', // Red cross / blood
+                'G': '#43a047', // Stethoscope teal/green
+                'C': '#b2ebf2'  // Doctor coat lapel
+            },
+            orderly: {
+                'K': '#000000', // Outline
+                'S': '#f3c192', // Burly skin
+                's': '#d59b6c', // Skin shadow
+                'M': '#4a3325', // Stubble / mustache
+                'W': '#ffffff', // White coat/cap
+                'w': '#b4c2ce', // Coat shadow
+                'T': '#1976d2', // Blue telnyashka stripe
+                'R': '#e53935', // Red cross
+                'G': '#76ff03', // Syringe glow
+                'P': '#37474f', // Pants
+                'Y': '#ffd700'  // Brass keys
+            }
+        };
+
+        // 16x22 Character Matrices
+        const SPRITES = {
+            playerWalk: [
+                // Frame 0
+                [
+                    ".....KKKKKK.....",
+                    "...KKHHHHHhKK...",
+                    "..KHHhhhhhhhHK..",
+                    ".KHHhSSSSSSShHK.",
+                    ".KHhSK.SS.KSShK.",
+                    ".KHhSSSSSSSSShK.",
+                    "..KhSSMSSSMShK..",
+                    "..KKhSSSSSSShK..",
+                    "...KKWWWWWWKK...",
+                    "..KWBWWWWWWWBK..",
+                    ".KWWBBWWWWBBWWK.",
+                    ".KWWWWBBBBWWWWK.",
+                    ".KWWWWWWWWWWWWK.",
+                    "..KWWWBwwBWWwK..",
+                    "..KwwwwwwwwwwK..",
+                    "...KWWKKKKWWK...",
+                    "...KPPK..KPPK...",
+                    "...KPPK..KPPK...",
+                    "...KPPK..KPPK...",
+                    "..KPPPK..KPPPK..",
+                    "..KKKK....KKKK..",
+                    "................"
+                ],
+                // Frame 1 (Step)
+                [
+                    ".....KKKKKK.....",
+                    "...KKHHHHHhKK...",
+                    "..KHHhhhhhhhHK..",
+                    ".KHHhSSSSSSShHK.",
+                    ".KHhSK.SS.KSShK.",
+                    ".KHhSSSSSSSSShK.",
+                    "..KhSSMSSSMShK..",
+                    "..KKhSSSSSSShK..",
+                    "...KKWWWWWWKK...",
+                    "..KWBWWWWWWWBK..",
+                    ".KWWBBWWWWBBWWK.",
+                    ".KWWWWBBBBWWWWK.",
+                    ".KWWWWWWWWWWWWK.",
+                    "..KWWWBwwBWWwK..",
+                    "..KwwwwwwwwwwK..",
+                    "...KWWKKKKWWK...",
+                    "...KPPPK.KPK....",
+                    "...KPPPK.KPK....",
+                    "...KKPPK.KPPK...",
+                    "....KKK..KPPPK..",
+                    ".........KKKK...",
+                    "................"
+                ]
+            ],
+            // Player in Stolen Doctor Coat (Victory!)
+            playerDoctor: [
+                ".....KKKKKK.....",
+                "...KKWWWWWWKK...",
+                "..KWWWRRRRWWWK..",
+                ".KWWRRRRRRRRWK..",
+                ".KWhSK.SS.KSShK.",
+                ".KWhSSSSSSSSShK.",
+                "..KhSSM..SMShK..",
+                "..KKhSSSSSSShK..",
+                "...KKWGGGGWWK...",
+                "..KWWGCCCCGWWK..",
+                ".KWWWCWCCWCWWWK.",
+                ".KWWWCWCCWCWWWK.",
+                ".KWWWCWCCWCWWWK.",
+                "..KWWCWCCWCWwK..",
+                "..KwwwwwwwwwwK..",
+                "...KWWKKKKWWK...",
+                "...KPPK..KPPK...",
+                "...KPPK..KPPK...",
+                "...KPPK..KPPK...",
+                "..KPPPK..KPPPK..",
+                "..KKKK....KKKK..",
+                "................"
+            ],
+            // Orderly Mihalych Overworld
+            orderlyWalk: [
+                [
+                    "....KKKKKKKK....",
+                    "...KWWWWWWWWK...",
+                    "..KWWWRRRRWWWK..",
+                    "..KWWRRRRRRRWK..",
+                    ".KKSSsSSSSsSSKK.",
+                    ".KSSSM.SS.MSSSK.",
+                    ".KSSSSSSSSSSSSK.",
+                    ".KSSSSMMMMSSSSK.",
+                    "..KSSMMMMMMSSK..",
+                    "...KKWWWWWWKK...",
+                    "..KWWWWWWWWWWK..",
+                    ".KWWWWWWWWWWWWK.",
+                    ".KWWWRWWWWWKWWK.",
+                    ".KWWWRWWWWWKWWK.",
+                    ".KWWWWWWWWWWWWK.",
+                    "..KWWWWWWWWWWK..",
+                    "..KwwwwwwwwwwK..",
+                    "...KPPKKKKPPK...",
+                    "...KPPK..KPPK...",
+                    "...KPPK..KPPK...",
+                    "..KPPPK..KPPPK..",
+                    "..KKKK....KKKK.."
+                ],
+                [
+                    "....KKKKKKKK....",
+                    "...KWWWWWWWWK...",
+                    "..KWWWRRRRWWWK..",
+                    "..KWWRRRRRRRWK..",
+                    ".KKSSsSSSSsSSKK.",
+                    ".KSSSM.SS.MSSSK.",
+                    ".KSSSSSSSSSSSSK.",
+                    ".KSSSSMMMMSSSSK.",
+                    "..KSSMMMMMMSSK..",
+                    "...KKWWWWWWKK...",
+                    "..KWWWWWWWWWWK..",
+                    ".KWWWWWWWWWWWWK.",
+                    ".KWWWRWWWWWKWWK.",
+                    ".KWWWRWWWWWKWWK.",
+                    ".KWWWWWWWWWWWWK.",
+                    "..KWWWWWWWWWWK..",
+                    "..KwwwwwwwwwwK..",
+                    "...KPPPK.KPK....",
+                    "...KPPPK.KPK....",
+                    "...KKPPK.KPPK...",
+                    "....KKK..KPPPK..",
+                    ".........KKKK..."
+                ]
+            ],
+            // Mihalych Stripped into Telnyashka (when locked inside cell)
+            orderlyTelnyashka: [
+                "....KKKKKKKK....",
+                "...KMMMMMMMMK...",
+                "..KMMMMMMMMMMK..",
+                ".KKSSsSSSSsSSKK.",
+                ".KSSSM.SS.MSSSK.",
+                ".KSSSSSSSSSSSSK.",
+                ".KSSSSMMMMSSSSK.",
+                "..KSSMMMMMMSSK..",
+                "...KKWTWTWTWKK..",
+                "..KWTWTWTWTWTK..",
+                ".KWTWTWTWTWTWTK.",
+                ".KWTWTWTWTWTWTK.",
+                ".KWTWTWTWTWTWTK.",
+                ".KWTWTWTWTWTWTK.",
+                "..KWTWTWTWTWTK..",
+                "..KwwwwwwwwwwK..",
+                "...KPPKKKKPPK...",
+                "...KPPK..KPPK...",
+                "...KPPK..KPPK...",
+                "..KPPPK..KPPPK..",
+                "..KKKK....KKKK..",
+                "................"
+            ]
+        };
+
+        /* ==========================================
+           GAME STATE & CONSTANTS
+           ========================================== */
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const pCanvas = document.getElementById('portraitCanvas');
+        const pCtx = pCanvas.getContext('2d');
+
+        const SECRET_COMBO = ['BANG', 'SCREAM', 'BANG', 'BANG', 'SCREAM'];
+
+        let endingsUnlocked = {
+            escape: false,
+            vegetable: false
+        };
+
+        let gameState = {
+            mode: 'CUTSCENE_DRAG', // CUTSCENE_DRAG, EXPLORE, CUTSCENE_ORDERLY_ENTER, DIALOGUE, CHOICE, BATTLE, POST_BATTLE_CUTSCENE, ENDING_VEGETABLE, ENDING_ESCAPE
+            inBattle: false,
+            tick: 0,
+            doorActionHistory: [],
+            doorOpen: true, // starts OPEN during drag cutscene!
+            orderlyAtWindow: false,
+            orderlyInside: false,
+            isVegetable: false,
+            playerHP: 20,
+            maxHP: 20,
+            cutsceneStep: 0,
+            enterTimer: 0,
+            dustParticles: []
+        };
+
+        // Player Overworld state
+        const player = {
+            x: 304,
+            y: 330,
+            w: 32,
+            h: 44,
+            speed: 3.2,
+            vx: 0,
+            vy: 0,
+            dir: 'down',
+            moving: false,
+            stepFrame: 0,
+            stepTimer: 0,
+            hasDoctorCoat: false
+        };
+
+        // Orderly Mihalych
+        const orderly = {
+            x: 270,
+            y: 330,
+            w: 32,
+            h: 44,
+            dir: 'up',
+            state: 'dragging', // dragging, outside, window, entering, inside, stripped_locked, injecting
+            hasCoat: true,
+            alertIcon: null, // '?', '!'
+            stepFrame: 0
+        };
+
+        // Second orderly (Петрович / Стажёр)
+        const orderly2 = {
+            x: 338,
+            y: 330,
+            w: 32,
+            h: 44,
+            visible: true,
+            isNewbie: false
+        };
+
+        // Overworld Room Boundaries
+        const ROOM = {
+            left: 110,
+            right: 530,
+            top: 75,
+            bottom: 300,
+            doorX: 320,
+            doorY: 300
+        };
+
+        // Undertale Battle System state
+        const battle = {
+            phase: 'MENU', // INTRO_FLASH, MENU, ATTACK_BAR, SLASH_ANIM, ENEMY_DIALOGUE, DODGE, VICTORY
+            turnCount: 0,
+            enemyHP: 100,
+            enemyMaxHP: 100,
+            enemyDefDown: false,
+            enemyShake: 0,
+            lastDamage: 0,
+            damagePopups: [],
+            slashTimer: 0,
+            barCursor: 0,
+            barDir: 1,
+            pillsLeft: 2,
+            selectedBtn: 0, // 0: FIGHT, 1: ACT, 2: ITEM, 3: MERCY
+            box: { x: 205, y: 175, w: 230, h: 145 },
+            soul: { x: 312, y: 245, size: 16, speed: 3.5, invuln: 0 },
+            bullets: [],
+            waveTimer: 0,
+            waveDuration: 260
+        };
+
+        /* ==========================================
+           VIRTUAL JOYSTICK & TOUCH CONTROLS
+           ========================================== */
+        const joystick = {
+            active: false,
+            baseX: 0,
+            baseY: 0,
+            maxRadius: 46,
+            x: 0, // -1 to 1
+            y: 0  // -1 to 1
+        };
+
+        const jBase = document.getElementById('joystick-base');
+        const jKnob = document.getElementById('joystick-knob');
+
+        jBase.addEventListener('pointerdown', (e) => {
+            initAudio();
+            joystick.active = true;
+            jBase.setPointerCapture(e.pointerId);
+            const rect = jBase.getBoundingClientRect();
+            joystick.baseX = rect.left + rect.width / 2;
+            joystick.baseY = rect.top + rect.height / 2;
+            handleJoystickMove(e);
+        });
+
+        jBase.addEventListener('pointermove', (e) => {
+            if (!joystick.active) return;
+            handleJoystickMove(e);
+        });
+
+        function handleJoystickEnd(e) {
+            joystick.active = false;
+            joystick.x = 0;
+            joystick.y = 0;
+            jKnob.style.transform = `translate(0px, 0px)`;
+        }
+
+        jBase.addEventListener('pointerup', handleJoystickEnd);
+        jBase.addEventListener('pointercancel', handleJoystickEnd);
+
+        function handleJoystickMove(e) {
+            const dx = e.clientX - joystick.baseX;
+            const dy = e.clientY - joystick.baseY;
+            const dist = Math.hypot(dx, dy);
+            const angle = Math.atan2(dy, dx);
+            const clampedDist = Math.min(dist, joystick.maxRadius);
+
+            joystick.x = (clampedDist / joystick.maxRadius) * Math.cos(angle);
+            joystick.y = (clampedDist / joystick.maxRadius) * Math.sin(angle);
+
+            const knobX = clampedDist * Math.cos(angle);
+            const knobY = clampedDist * Math.sin(angle);
+            jKnob.style.transform = `translate(${knobX}px, ${knobY}px)`;
+        }
+
+        // Keyboard Controls
+        const keys = {
+            up: false, down: false, left: false, right: false
+        };
+
+        window.addEventListener('keydown', (e) => {
+            initAudio();
+            if (['ArrowUp', 'w', 'W', 'ц', 'Ц'].includes(e.key)) { e.preventDefault(); keys.up = true; }
+            else if (['ArrowDown', 's', 'S', 'ы', 'Ы'].includes(e.key)) { e.preventDefault(); keys.down = true; }
+            else if (['ArrowLeft', 'a', 'A', 'ф', 'Ф'].includes(e.key)) { e.preventDefault(); keys.left = true; }
+            else if (['ArrowRight', 'd', 'D', 'в', 'В'].includes(e.key)) { e.preventDefault(); keys.right = true; }
+            else if (['z', 'Z', 'я', 'Я', 'Enter', ' '].includes(e.key)) { e.preventDefault(); triggerButton('Z', true); }
+            else if (['x', 'X', 'ч', 'Ч', 'Shift', 'Escape'].includes(e.key)) { e.preventDefault(); triggerButton('X', true); }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (['ArrowUp', 'w', 'W', 'ц', 'Ц'].includes(e.key)) keys.up = false;
+            else if (['ArrowDown', 's', 'S', 'ы', 'Ы'].includes(e.key)) keys.down = false;
+            else if (['ArrowLeft', 'a', 'A', 'ф', 'Ф'].includes(e.key)) keys.left = false;
+            else if (['ArrowRight', 'd', 'D', 'в', 'В'].includes(e.key)) keys.right = false;
+            else if (['z', 'Z', 'я', 'Я', 'Enter', ' '].includes(e.key)) triggerButton('Z', false);
+            else if (['x', 'X', 'ч', 'Ч', 'Shift', 'Escape'].includes(e.key)) triggerButton('X', false);
+        });
+
+        function triggerButton(btn, isDown) {
+            initAudio();
+            const el = document.getElementById(btn === 'Z' ? 'btn-z' : 'btn-x');
+            if (isDown) {
+                el.classList.add('pressed');
+                if (btn === 'Z') handleConfirm();
+                if (btn === 'X') handleCancel();
+            } else {
+                el.classList.remove('pressed');
+            }
+        }
+
+        /* ==========================================
+           SCREEN SHAKE & DUST PARTICLES
+           ========================================== */
+        function triggerScreenShake(isHard = true) {
+            const wrap = document.getElementById('canvas-wrapper');
+            wrap.classList.remove('shake-active');
+            void wrap.offsetWidth;
+            wrap.classList.add('shake-active');
+
+            // Spawn dust particles at door
+            for (let i = 0; i < 16; i++) {
+                gameState.dustParticles.push({
+                    x: 280 + Math.random() * 80,
+                    y: 295 + Math.random() * 15,
+                    vx: (Math.random() - 0.5) * 4,
+                    vy: -(Math.random() * 3 + 1),
+                    size: Math.random() * 4 + 2,
+                    alpha: 1,
+                    color: Math.random() < 0.3 ? '#ffd700' : '#d8dce3'
+                });
+            }
+        }
+
+        /* ==========================================
+           DIALOGUE & UNDERTALE CHOICE SYSTEM
+           ========================================== */
+        let dialogueQueue = [];
+        let currentLine = null;
+        let typedIndex = 0;
+        let typingTimer = null;
+        let currentChoices = [];
+        let selectedChoiceIndex = 0;
+        let onDialogueComplete = null;
+
+        function startDialogue(lines, callback = null) {
+            dialogueQueue = [...lines];
+            onDialogueComplete = callback;
+            document.getElementById('choices-container').classList.add('hidden');
+            document.getElementById('dialogue-next-hint').classList.remove('hidden');
+            nextDialogueLine();
+        }
+
+        function nextDialogueLine() {
+            if (typingTimer) {
+                clearInterval(typingTimer);
+                typingTimer = null;
+            }
+
+            if (dialogueQueue.length === 0) {
+                if (onDialogueComplete) {
+                    const cb = onDialogueComplete;
+                    onDialogueComplete = null;
+                    cb();
+                } else if (!gameState.inBattle && gameState.mode === 'DIALOGUE') {
+                    gameState.mode = 'EXPLORE';
+                    resetIdleStatus();
+                }
+                return;
+            }
+
+            currentLine = dialogueQueue.shift();
+            typedIndex = 0;
+
+            const textEl = document.getElementById('dialogue-text');
+            const speakerEl = document.getElementById('speaker-name');
+            textEl.textContent = '';
+            speakerEl.textContent = currentLine.name || '';
+
+            drawPortrait(currentLine.portrait);
+
+            const fullText = currentLine.text;
+            const speed = currentLine.slow ? 65 : 24;
+
+            typingTimer = setInterval(() => {
+                if (typedIndex < fullText.length) {
+                    const ch = fullText[typedIndex];
+                    textEl.textContent += ch;
+                    if (ch !== ' ' && typedIndex % 2 === 0) {
+                        playVoiceBlip(currentLine.voice || 'narrator');
+                    }
+                    typedIndex++;
+                } else {
+                    clearInterval(typingTimer);
+                    typingTimer = null;
+                }
+            }, speed);
+        }
+
+        function showChoices(promptText, portrait, choices) {
+            if (typingTimer) {
+                clearInterval(typingTimer);
+                typingTimer = null;
+            }
+            if (!gameState.inBattle) {
+                gameState.mode = 'CHOICE';
+            }
+            currentChoices = choices;
+            selectedChoiceIndex = 0;
+
+            const textEl = document.getElementById('dialogue-text');
+            const speakerEl = document.getElementById('speaker-name');
+            const choicesEl = document.getElementById('choices-container');
+            const nextHint = document.getElementById('dialogue-next-hint');
+
+            textEl.textContent = promptText;
+            speakerEl.textContent = '';
+            nextHint.classList.add('hidden');
+
+            drawPortrait(portrait);
+            choicesEl.classList.remove('hidden');
+            renderChoices();
+        }
+
+        function renderChoices() {
+            const choicesEl = document.getElementById('choices-container');
+            choicesEl.innerHTML = '';
+
+            currentChoices.forEach((choice, idx) => {
+                const isSelected = idx === selectedChoiceIndex;
+                const item = document.createElement('div');
+                item.className = `flex items-center gap-1.5 p-1 rounded cursor-pointer ${isSelected ? 'text-yellow-300 font-bold' : 'text-zinc-300'}`;
+                item.innerHTML = `
+                    <span class="inline-block w-3.5 text-center" style="color: ${isSelected ? '#ff0000' : 'transparent'}">♥</span>
+                    <span>${choice.label}</span>
+                `;
+                item.onpointerdown = () => {
+                    selectedChoiceIndex = idx;
+                    playTone(340, 0.03, 'square', 0.05);
+                    renderChoices();
+                };
+                item.onclick = () => {
+                    selectedChoiceIndex = idx;
+                    handleConfirm();
+                };
+                choicesEl.appendChild(item);
+            });
+        }
+
+        function moveChoice(delta) {
+            if (currentChoices.length === 0) return;
+            selectedChoiceIndex = (selectedChoiceIndex + delta + currentChoices.length) % currentChoices.length;
+            playTone(320, 0.025, 'square', 0.05);
+            renderChoices();
+        }
+
+        function handleConfirm() {
+            initAudio();
+
+            // Battle timing bar hit
+            if (gameState.inBattle && battle.phase === 'ATTACK_BAR') {
+                confirmAttackBarHit();
+                return;
+            }
+
+            // Choice selection
+            if (currentChoices.length > 0 && !document.getElementById('choices-container').classList.contains('hidden')) {
+                playTone(480, 0.05, 'square', 0.09);
+                const action = currentChoices[selectedChoiceIndex].action;
+                document.getElementById('choices-container').classList.add('hidden');
+                document.getElementById('dialogue-next-hint').classList.remove('hidden');
+                currentChoices = [];
+                if (action) action();
+                return;
+            }
+
+            // Typing fast skip
+            if (typingTimer && currentLine) {
+                clearInterval(typingTimer);
+                typingTimer = null;
+                document.getElementById('dialogue-text').textContent = currentLine.text;
+                return;
+            }
+
+            // Next dialogue line
+            if (dialogueQueue.length > 0 || onDialogueComplete) {
+                nextDialogueLine();
+                return;
+            }
+
+            // Overworld interaction
+            if (gameState.mode === 'EXPLORE') {
+                tryInteract();
+            }
+        }
+
+        function handleCancel() {
+            if (typingTimer && currentLine) {
+                clearInterval(typingTimer);
+                typingTimer = null;
+                document.getElementById('dialogue-text').textContent = currentLine.text;
+            }
+        }
+
+        function resetIdleStatus() {
+            drawPortrait('player_normal');
+            document.getElementById('speaker-name').textContent = '';
+            document.getElementById('dialogue-next-hint').classList.add('hidden');
+            document.getElementById('dialogue-text').textContent = '* Вы заперты в мягкой одиночной камере №6. Подойдите к двери или осмотрите стену.';
+        }
+
+        /* ==========================================
+           PORTRAIT DRAWING (64x64 CANVAS)
+           ========================================== */
+        function drawPortrait(type) {
+            pCtx.fillStyle = '#000000';
+            pCtx.fillRect(0, 0, 64, 64);
+
+            if (!type) return;
+
+            if (type.startsWith('player')) {
+                // Hair or Doctor Cap
+                if (type === 'player_doctor') {
+                    pCtx.fillStyle = '#ffffff';
+                    pCtx.fillRect(12, 4, 40, 14);
+                    pCtx.fillStyle = '#e53935';
+                    pCtx.fillRect(29, 6, 6, 10);
+                    pCtx.fillRect(25, 9, 14, 4);
+                } else {
+                    pCtx.fillStyle = '#5c3818';
+                    pCtx.fillRect(14, 8, 36, 12);
+                    pCtx.fillStyle = '#8a5828';
+                    pCtx.fillRect(16, 10, 32, 4);
+                }
+
+                // Face
+                pCtx.fillStyle = type === 'player_vegetable' ? '#c8e6c9' : '#fcd0a1';
+                pCtx.fillRect(16, 18, 32, 26);
+                pCtx.fillStyle = type === 'player_vegetable' ? '#a5d6a7' : '#e0b080';
+                pCtx.fillRect(16, 40, 32, 4);
+
+                // Eyes
+                if (type === 'player_vegetable') {
+                    // Derpy crossed eyes
+                    pCtx.fillStyle = '#000000';
+                    pCtx.fillRect(21, 25, 6, 6);
+                    pCtx.fillRect(37, 28, 6, 6);
+                    pCtx.fillStyle = '#ffffff';
+                    pCtx.fillRect(22, 26, 2, 2);
+                    pCtx.fillRect(40, 30, 2, 2);
+                    // Drool
+                    pCtx.fillStyle = '#4fc3f7';
+                    pCtx.fillRect(33, 40, 5, 12);
+                } else if (type === 'player_shock' || type === 'player_angry') {
+                    pCtx.fillStyle = '#ffffff';
+                    pCtx.fillRect(20, 24, 8, 8);
+                    pCtx.fillRect(36, 24, 8, 8);
+                    pCtx.fillStyle = '#000000';
+                    pCtx.fillRect(23, 26, 3, 3);
+                    pCtx.fillRect(39, 26, 3, 3);
+                } else {
+                    pCtx.fillStyle = '#000000';
+                    pCtx.fillRect(22, 26, 4, 6);
+                    pCtx.fillRect(38, 26, 4, 6);
+                }
+
+                // Mouth
+                pCtx.fillStyle = '#000000';
+                if (type === 'player_shock') {
+                    pCtx.fillRect(26, 36, 12, 6);
+                } else if (type === 'player_smirk' || type === 'player_doctor') {
+                    pCtx.fillRect(24, 37, 14, 3);
+                    pCtx.fillRect(36, 34, 3, 3);
+                } else {
+                    pCtx.fillRect(26, 37, 12, 3);
+                }
+
+                // Torso / Clothes
+                if (type === 'player_doctor') {
+                    pCtx.fillStyle = '#ffffff';
+                    pCtx.fillRect(10, 44, 44, 18);
+                    pCtx.fillStyle = '#26a69a';
+                    pCtx.fillRect(28, 44, 8, 18);
+                } else {
+                    pCtx.fillStyle = '#ffffff';
+                    pCtx.fillRect(10, 44, 44, 18);
+                    pCtx.fillStyle = '#78909c';
+                    pCtx.fillRect(12, 50, 40, 3);
+                }
+            } else if (type.startsWith('orderly')) {
+                // Cap with Red Cross
+                pCtx.fillStyle = '#ffffff';
+                pCtx.fillRect(14, 4, 36, 14);
+                pCtx.fillStyle = '#e53935';
+                pCtx.fillRect(29, 6, 6, 10);
+                pCtx.fillRect(25, 9, 14, 4);
+
+                // Face
+                pCtx.fillStyle = '#f3c192';
+                pCtx.fillRect(14, 18, 36, 28);
+                // Stubble / Mustache
+                pCtx.fillStyle = '#4a3325';
+                pCtx.fillRect(20, 34, 24, 6);
+
+                // Eyes
+                pCtx.fillStyle = '#000000';
+                if (type === 'orderly_angry') {
+                    pCtx.fillRect(19, 23, 8, 4);
+                    pCtx.fillRect(37, 23, 8, 4);
+                    pCtx.fillStyle = '#e53935';
+                    pCtx.fillRect(22, 26, 4, 4);
+                    pCtx.fillRect(38, 26, 4, 4);
+                } else if (type === 'orderly_panic') {
+                    pCtx.fillStyle = '#ffffff';
+                    pCtx.fillRect(18, 22, 9, 9);
+                    pCtx.fillRect(37, 22, 9, 9);
+                    pCtx.fillStyle = '#000000';
+                    pCtx.fillRect(21, 25, 3, 3);
+                    pCtx.fillRect(40, 25, 3, 3);
+                } else {
+                    pCtx.fillRect(20, 25, 6, 4);
+                    pCtx.fillRect(38, 25, 6, 4);
+                }
+
+                // Shoulders
+                pCtx.fillStyle = '#ffffff';
+                pCtx.fillRect(8, 46, 48, 18);
+            }
+        }
+
+        /* ==========================================
+           INTRO CUTSCENE & RESTART
+           ========================================== */
+        function restartGame() {
+            document.getElementById('app-root').classList.remove('drugged-mode');
+            gameState.playerHP = 20;
+            updateHP(20);
+            gameState.mode = 'CUTSCENE_DRAG';
+            gameState.inBattle = false;
+            gameState.cutsceneStep = 0;
+            gameState.doorActionHistory = [];
+            gameState.doorOpen = true; // OPEN while being dragged!
+            gameState.orderlyAtWindow = false;
+            gameState.orderlyInside = false;
+            gameState.isVegetable = false;
+            updateComboHUD();
+
+            player.x = 304;
+            player.y = 345;
+            player.hasDoctorCoat = false;
+
+            orderly.x = 270;
+            orderly.y = 345;
+            orderly.state = 'dragging';
+            orderly.hasCoat = true;
+            orderly.alertIcon = null;
+
+            orderly2.x = 338;
+            orderly2.y = 345;
+            orderly2.visible = true;
+            orderly2.isNewbie = false;
+
+            startIntroStep(0);
+        }
+
+        function startIntroStep(step) {
+            gameState.cutsceneStep = step;
+            if (step === 0) {
+                startDialogue([
+                    {
+                        name: 'САНИТАР МИХАЛЫЧ',
+                        portrait: 'orderly_angry',
+                        voice: 'orderly',
+                        text: '* Держи его крепче, Петрович! Ишь как дёргается, опять про свои «игры и коды» кричит!'
+                    }
+                ], () => startIntroStep(1));
+            } else if (step === 1) {
+                startDialogue([
+                    {
+                        name: 'ПАЦИЕНТ #404',
+                        portrait: 'player_shock',
+                        voice: 'player',
+                        text: '* Отпустите!! Я вообще-то нормальный! Меня сюда по ошибке привезли!'
+                    }
+                ], () => startIntroStep(2));
+            } else if (step === 2) {
+                // Shove player inside padded cell and SLAM steel door!
+                sfxDoorSlam();
+                triggerScreenShake();
+                gameState.doorOpen = false; // SLAM SHUT!
+                player.x = 304;
+                player.y = 195;
+                orderly.y = 335;
+                orderly2.visible = false;
+
+                startDialogue([
+                    {
+                        name: 'САНИТАР МИХАЛЫЧ',
+                        portrait: 'orderly_normal',
+                        voice: 'orderly',
+                        text: '* Ага-ага, у нас тут каждый второй — Наполеон, а каждый первый — «абсолютно здоров». Посиди-ка в мягкой одиночке!'
+                    },
+                    {
+                        name: '',
+                        portrait: null,
+                        voice: 'narrator',
+                        text: '* ГРОХОТ! Стальная дверь с лязгом захлопнулась на тяжелый засов. Вокруг вас только глухие стеганые стены.'
+                    }
+                ], () => {
+                    skipToCell();
+                });
+            }
+        }
+
+        function skipToCell() {
+            if (typingTimer) clearInterval(typingTimer);
+            dialogueQueue = [];
+            onDialogueComplete = null;
+            document.getElementById('app-root').classList.remove('drugged-mode');
+            document.getElementById('choices-container').classList.add('hidden');
+
+            gameState.playerHP = 20;
+            updateHP(20);
+            gameState.mode = 'EXPLORE';
+            gameState.inBattle = false;
+            gameState.doorActionHistory = [];
+            gameState.doorOpen = false;
+            gameState.orderlyAtWindow = false;
+            gameState.orderlyInside = false;
+            gameState.isVegetable = false;
+
+            player.x = 304;
+            player.y = 200;
+            player.hasDoctorCoat = false;
+
+            orderly.state = 'outside';
+            orderly.x = 304;
+            orderly.y = 340;
+            orderly.hasCoat = true;
+            orderly.alertIcon = null;
+
+            orderly2.visible = false;
+            updateComboHUD();
+            resetIdleStatus();
+        }
+
+        /* ==========================================
+           INTERACTIONS & SECRET WALL HINT
+           ========================================== */
+        function getNearbyInteractable() {
+            const px = player.x + player.w / 2;
+            const py = player.y + player.h / 2;
+
+            // 1. Door (bottom center)
+            if (Math.abs(px - 320) < 55 && py > 265) {
+                return 'DOOR';
+            }
+            // 2. Secret Wall Hint (top-right wall)
+            if (px > 420 && py < 130) {
+                return 'WALL_HINT';
+            }
+            // 3. Soft Pillow (top-left corner)
+            if (px < 185 && py < 140) {
+                return 'PILLOW';
+            }
+            return null;
+        }
+
+        function tryInteract() {
+            const target = getNearbyInteractable();
+            if (!target) return;
+
+            if (target === 'WALL_HINT') {
+                gameState.mode = 'DIALOGUE';
+                startDialogue([
+                    {
+                        name: 'ТАИНСТВЕННЫЙ ШИФР',
+                        portrait: 'player_shock',
+                        voice: 'narrator',
+                        text: '* На обшивке стены кто-то нацарапал ногтями странный шифр пациента №0: «РЕЦЕПТ ВЕЧНОГО СПОКОЙСТВИЯ: Ударь. Закричи. Дважды ударь. И снова закричи у самой двери...»'
+                    }
+                ]);
+            } else if (target === 'PILLOW') {
+                gameState.mode = 'DIALOGUE';
+                startDialogue([
+                    {
+                        name: '',
+                        portrait: null,
+                        voice: 'narrator',
+                        text: '* Мягкая больничная подушка. На ней горькие слезы и запах валерьянки.'
+                    }
+                ]);
+            } else if (target === 'DOOR') {
+                openDoorMenu();
+            }
+        }
+
+        function openDoorMenu() {
+            showChoices(
+                '* Массивная стальная дверь с решетчатым бронеокошком. Ваши действия?',
+                'player_normal',
+                [
+                    { label: 'Постучать', action: () => handleDoorAction('KNOCK') },
+                    { label: 'Орать, что ты не псих', action: () => handleDoorAction('SCREAM') },
+                    { label: 'Тарабанить (буянить и бить)', action: () => handleDoorAction('BANG') },
+                    { label: 'Отойти от двери', action: () => { gameState.mode = 'EXPLORE'; resetIdleStatus(); } }
+                ]
+            );
+        }
+
+        function updateComboHUD() {
+            const hud = document.getElementById('combo-hud');
+            const container = document.getElementById('combo-badges');
+
+            if (gameState.doorActionHistory.length === 0) {
+                hud.classList.add('hidden');
+                return;
+            }
+
+            hud.classList.remove('hidden');
+            container.innerHTML = gameState.doorActionHistory.map(act => {
+                if (act === 'BANG') return '<span class="px-1 py-0.5 bg-red-950 border border-red-500 text-red-300 rounded">🥊ТАРАБАНИТЬ</span>';
+                if (act === 'SCREAM') return '<span class="px-1 py-0.5 bg-amber-950 border border-amber-400 text-amber-300 rounded">🤬ОРАТЬ</span>';
+                return '';
+            }).join('<span>→</span>');
+        }
+
+        function handleDoorAction(type) {
+            if (type === 'KNOCK') {
+                sfxKnock();
+                gameState.doorActionHistory = [];
+                updateComboHUD();
+                gameState.orderlyAtWindow = true;
+                orderly.state = 'window';
+
+                gameState.mode = 'DIALOGUE';
+                startDialogue([
+                    {
+                        name: '',
+                        portrait: null,
+                        voice: 'narrator',
+                        text: '* Тук-тук-тук. Вы вежливо постучали по бронированной двери.'
+                    },
+                    {
+                        name: 'САНИТАР МИХАЛЫЧ',
+                        portrait: 'orderly_normal',
+                        voice: 'orderly',
+                        text: '* (В окошке показалось помятое лицо санитара) Чего таращишься, болезный? Тихий час вообще-то!'
+                    }
+                ], () => {
+                    openOrderlyDialogue();
+                });
+                return;
+            }
+
+            // Append noise action
+            gameState.doorActionHistory.push(type);
+            if (gameState.doorActionHistory.length > 5) gameState.doorActionHistory.shift();
+            updateComboHUD();
+
+            // Secret combo check: ['BANG', 'SCREAM', 'BANG', 'BANG', 'SCREAM']
+            const isSecretMatched = gameState.doorActionHistory.length === 5 &&
+                gameState.doorActionHistory.every((val, idx) => val === SECRET_COMBO[idx]);
+
+            if (isSecretMatched) {
+                triggerVegetableEnding();
+                return;
+            }
+
+            if (type === 'BANG') {
+                sfxDoorSlam();
+                triggerScreenShake();
+                gameState.mode = 'DIALOGUE';
+                startDialogue([
+                    {
+                        name: 'ПАЦИЕНТ #404',
+                        portrait: 'player_angry',
+                        voice: 'player',
+                        text: '* БАМ! БАМ! Вы со всей силы колотите ногами по стальной двери! За дверью слышен раздраженный мат санитаров.'
+                    }
+                ], () => openDoorMenu());
+            } else if (type === 'SCREAM') {
+                sfxScream();
+                triggerScreenShake();
+                gameState.mode = 'DIALOGUE';
+                startDialogue([
+                    {
+                        name: 'ПАЦИЕНТ #404',
+                        portrait: 'player_shock',
+                        voice: 'player',
+                        text: '* «Я НЕ ПСИХ!! ВЫПУСТИТЕ МЕНЯ НЕМЕДЛЕННО, Я АБСОЛЮТНО ЗДОРОВ!!»'
+                    }
+                ], () => openDoorMenu());
+            }
+        }
+
+        function openOrderlyDialogue() {
+            showChoices(
+                '* Михалыч подозрительно сверлит вас взглядом через решетку окошка.',
+                'orderly_normal',
+                [
+                    {
+                        label: '«Вы выронили телефон у меня в камере!»',
+                        action: () => triggerOrderlySmoothEnter()
+                    },
+                    {
+                        label: '«Откройте, я совершенно здоров!»',
+                        action: () => {
+                            gameState.mode = 'DIALOGUE';
+                            gameState.orderlyAtWindow = false;
+                            orderly.state = 'outside';
+                            startDialogue([
+                                {
+                                    name: 'САНИТАР МИХАЛЫЧ',
+                                    portrait: 'orderly_normal',
+                                    voice: 'orderly',
+                                    text: '* Ага, расскажешь главврачу в понедельник на обходе. Спи давай! (Закрывает заслонку окошка).'
+                                }
+                            ]);
+                        }
+                    }
+                ]
+            );
+        }
+
+        /* ==========================================
+           SCRIPTED ANIMATION: ORDERLY ENTERS ROOM
+           ========================================== */
+        function triggerOrderlySmoothEnter() {
+            sfxDoorCreak();
+            triggerScreenShake(false);
+
+            gameState.mode = 'CUTSCENE_ORDERLY_ENTER';
+            gameState.doorOpen = true;
+            gameState.orderlyAtWindow = false;
+            gameState.orderlyInside = true;
+            gameState.enterTimer = 0;
+
+            orderly.x = 304;
+            orderly.y = 315;
+            orderly.state = 'entering';
+            orderly.alertIcon = null;
+        }
+
+        function updateOrderlyEnterCutscene() {
+            gameState.enterTimer++;
+
+            // 1. Player steps back to center
+            if (player.y > 155) {
+                player.y -= 1.8;
+                player.dir = 'down';
+                player.stepFrame = (Math.floor(gameState.enterTimer / 6) % 2);
+            }
+
+            // 2. Orderly walks in from door to room center
+            if (orderly.y > 215) {
+                orderly.y -= 1.6;
+                orderly.stepFrame = (Math.floor(gameState.enterTimer / 6) % 2);
+            } else if (gameState.enterTimer < 110) {
+                // 3. Orderly looks around with '?'
+                orderly.alertIcon = '?';
+                orderly.x = 304 + Math.sin(gameState.enterTimer * 0.1) * 6;
+            } else if (gameState.enterTimer < 145) {
+                // 4. Pats coat and realizes phone is with him '!'
+                if (orderly.alertIcon !== '!') {
+                    playTone(600, 0.1, 'square', 0.2);
+                    orderly.alertIcon = '!';
+                }
+            } else {
+                // 5. Angry dialogue and start battle!
+                orderly.alertIcon = null;
+                gameState.mode = 'DIALOGUE';
+                startDialogue([
+                    {
+                        name: 'САНИТАР МИХАЛЫЧ',
+                        portrait: 'orderly_angry',
+                        voice: 'orderly',
+                        text: '* Погоди-ка... Вот же мой телефон, во внутреннем кармане лежит! Ах ты ж хитрый симулянт, обмануть меня вздумал?!'
+                    },
+                    {
+                        name: 'САНИТАР МИХАЛЫЧ',
+                        portrait: 'orderly_angry',
+                        voice: 'orderly',
+                        text: '* Ну всё, щас я тебе пропишу персональную терапию шприцем!'
+                    }
+                ], () => {
+                    startUndertaleBattle();
+                });
+            }
+        }
+
+        /* ==========================================
+           UNDERTALE BATTLE SYSTEM
+           ========================================== */
+        function startUndertaleBattle() {
+            sfxBattleStart();
+            gameState.inBattle = true;
+            gameState.mode = 'BATTLE';
+            battle.phase = 'INTRO_FLASH';
+            battle.turnCount = 0;
+            battle.enemyHP = 100;
+            battle.enemyMaxHP = 100;
+            battle.enemyDefDown = false;
+            battle.pillsLeft = 2;
+            battle.bullets = [];
+            battle.selectedBtn = 0;
+
+            setTimeout(() => {
+                openBattleMenu('* Санитар Михалыч преграждает путь к двери!');
+            }, 600);
+        }
+
+        function openBattleMenu(promptText) {
+            battle.phase = 'MENU';
+            showChoices(
+                promptText || '* Михалыч грозно крутит связкой больничных ключей.',
+                'orderly_angry',
+                [
+                    { label: '⚔ БИТВА', action: () => startAttackBar() },
+                    { label: '🔊 ДЕЙСТВИЕ', action: () => openActMenu() },
+                    { label: `💊 ВЕЩИ (Валерьянка x${battle.pillsLeft})`, action: () => useItem() },
+                    { label: '✖ ПОЩАДА', action: () => spareEnemy() }
+                ]
+            );
+        }
+
+        function openActMenu() {
+            showChoices(
+                '* Выберите действие хитрости:',
+                'player_smirk',
+                [
+                    {
+                        label: 'Оценить противника',
+                        action: () => {
+                            battle.phase = 'ENEMY_DIALOGUE';
+                            startDialogue([
+                                {
+                                    name: 'ОЦЕНКА',
+                                    portrait: 'orderly_normal',
+                                    text: '* САНИТАР МИХАЛЫЧ — АТК 4, ЗАЩ 2. Носит белый медицинский халат. Кто первый надел халат — тот и врач!'
+                                }
+                            ], () => startDodgeWave());
+                        }
+                    },
+                    {
+                        label: '«У вас шнурки развязались!»',
+                        action: () => {
+                            battle.phase = 'ENEMY_DIALOGUE';
+                            battle.enemyDefDown = true;
+                            startDialogue([
+                                {
+                                    name: 'ПАЦИЕНТ #404',
+                                    portrait: 'player_smirk',
+                                    voice: 'player',
+                                    text: '* Михалыч, смотри под ноги, у тебя шнурки на тапках развязались!'
+                                },
+                                {
+                                    name: 'САНИТАР МИХАЛЫЧ',
+                                    portrait: 'orderly_panic',
+                                    voice: 'orderly',
+                                    text: '* Где?! А ведь у меня тапки на липучках!.. Тьфу ты, сбил с толку! (ЗАЩИТА Михалыча снижена!)'
+                                }
+                            ], () => startDodgeWave());
+                        }
+                    },
+                    { label: 'Назад', action: () => openBattleMenu() }
+                ]
+            );
+        }
+
+        function useItem() {
+            if (battle.pillsLeft <= 0) {
+                openBattleMenu('* У вас не осталось таблеток валерьянки!');
+                return;
+            }
+            sfxHeal();
+            battle.pillsLeft--;
+            gameState.playerHP = Math.min(gameState.maxHP, gameState.playerHP + 12);
+            updateHP(gameState.playerHP);
+
+            battle.phase = 'ENEMY_DIALOGUE';
+            startDialogue([
+                {
+                    name: '',
+                    portrait: 'player_normal',
+                    text: `* Вы проглотили таблетку сладкой валерьянки. Восстановлено +12 ОЗ! (Осталось: ${battle.pillsLeft})`
+                }
+            ], () => startDodgeWave());
+        }
+
+        function spareEnemy() {
+            battle.phase = 'ENEMY_DIALOGUE';
+            startDialogue([
+                {
+                    name: 'САНИТАР МИХАЛЫЧ',
+                    portrait: 'orderly_angry',
+                    voice: 'orderly',
+                    text: '* Никакой пощады буйным! Мне ещё этого... халата лишиться не хватало! Получай!'
+                }
+            ], () => startDodgeWave());
+        }
+
+        function startAttackBar() {
+            battle.phase = 'ATTACK_BAR';
+            battle.barCursor = 0;
+            battle.barDir = 1;
+            document.getElementById('choices-container').classList.add('hidden');
+            document.getElementById('dialogue-next-hint').classList.add('hidden');
+            document.getElementById('speaker-name').textContent = 'ПРИЦЕЛ АТАКИ';
+            document.getElementById('dialogue-text').textContent = '* Нажмите [Z], когда белая полоса будет ровно в центре шкалы для КРИТИЧЕСКОГО УДАРА!';
+        }
+
+        function confirmAttackBarHit() {
+            sfxSlash();
+            triggerScreenShake();
+
+            const dist = Math.abs(battle.barCursor - 0.5);
+            let dmg = Math.round((1 - dist * 1.4) * 38);
+            if (dist < 0.08) dmg = 46; // Critical hit!
+            if (battle.enemyDefDown) {
+                dmg = Math.round(dmg * 1.4);
+                battle.enemyDefDown = false;
+            }
+            dmg = Math.max(16, dmg);
+
+            battle.lastDamage = dmg;
+            battle.enemyHP = Math.max(0, battle.enemyHP - dmg);
+            battle.enemyShake = 22;
+            battle.slashTimer = 44;
+            battle.phase = 'SLASH_ANIM';
+
+            // Damage popup text
+            battle.damagePopups.push({
+                x: 320,
+                y: 70,
+                vy: -3.5,
+                text: `-${dmg}`,
+                life: 50
+            });
+        }
+
+        function startDodgeWave() {
+            if (battle.enemyHP <= 0) {
+                triggerBattleVictory();
+                return;
+            }
+
+            battle.turnCount++;
+            const taunts = [
+                '* Щас я тебе вколю успокоительную дозу!',
+                '* Лови больничный инвентарь, беглец!',
+                '* Никто ещё не уходил из шестой палаты!'
+            ];
+            const taunt = taunts[(battle.turnCount - 1) % taunts.length];
+
+            battle.phase = 'ENEMY_DIALOGUE';
+            startDialogue([
+                {
+                    name: 'САНИТАР МИХАЛЫЧ',
+                    portrait: 'orderly_angry',
+                    voice: 'orderly',
+                    text: taunt
+                }
+            ], () => {
+                battle.phase = 'DODGE';
+                battle.waveTimer = battle.waveDuration;
+                battle.bullets = [];
+                battle.soul.x = battle.box.x + battle.box.w / 2 - 8;
+                battle.soul.y = battle.box.y + battle.box.h / 2 - 8;
+                battle.soul.invuln = 0;
+
+                document.getElementById('speaker-name').textContent = 'УВОРАЧИВАЙТЕСЬ!';
+                document.getElementById('dialogue-text').textContent = '* Управляйте красным сердцем ДЖОЙСТИКОМ или стрелками, уворачиваясь от шприцев и пилюль!';
+            });
+        }
+
+        function updateBattle() {
+            if (battle.enemyShake > 0) battle.enemyShake--;
+
+            // Update damage popups
+            for (let i = battle.damagePopups.length - 1; i >= 0; i--) {
+                const p = battle.damagePopups[i];
+                p.y += p.vy;
+                p.vy += 0.15; // gravity
+                p.life--;
+                if (p.life <= 0) battle.damagePopups.splice(i, 1);
+            }
+
+            if (battle.phase === 'ATTACK_BAR') {
+                battle.barCursor += 0.024 * battle.barDir;
+                if (battle.barCursor >= 1) { battle.barCursor = 1; battle.barDir = -1; }
+                else if (battle.barCursor <= 0) { battle.barCursor = 0; battle.barDir = 1; }
+            } else if (battle.phase === 'SLASH_ANIM') {
+                battle.slashTimer--;
+                if (battle.slashTimer <= 0) {
+                    if (battle.enemyHP <= 0) {
+                        triggerBattleVictory();
+                    } else {
+                        startDodgeWave();
+                    }
+                }
+            } else if (battle.phase === 'DODGE') {
+                // Move Soul via Joystick or Keyboard
+                let moveX = joystick.x;
+                let moveY = joystick.y;
+                if (keys.left) moveX -= 1;
+                if (keys.right) moveX += 1;
+                if (keys.up) moveY -= 1;
+                if (keys.down) moveY += 1;
+
+                battle.soul.x += moveX * battle.soul.speed;
+                battle.soul.y += moveY * battle.soul.speed;
+
+                // Clamp soul in battle box
+                const bx = battle.box.x + 6;
+                const by = battle.box.y + 6;
+                const bw = battle.box.w - 12 - battle.soul.size;
+                const bh = battle.box.h - 12 - battle.soul.size;
+                battle.soul.x = Math.max(bx, Math.min(bx + bw, battle.soul.x));
+                battle.soul.y = Math.max(by, Math.min(by + bh, battle.soul.y));
+
+                if (battle.soul.invuln > 0) battle.soul.invuln--;
+
+                // Spawn attack patterns
+                const b = battle.box;
+                if (battle.waveTimer % 24 === 0) {
+                    // Flying Syringes from sides
+                    const fromLeft = Math.random() < 0.5;
+                    battle.bullets.push({
+                        x: fromLeft ? b.x - 18 : b.x + b.w + 18,
+                        y: b.y + 16 + Math.random() * (b.h - 32),
+                        vx: fromLeft ? 3.3 : -3.3,
+                        vy: 0,
+                        w: 20,
+                        h: 8,
+                        type: 'syringe'
+                    });
+                }
+                if (battle.waveTimer % 22 === 0) {
+                    // Falling and bouncing pills
+                    battle.bullets.push({
+                        x: b.x + 16 + Math.random() * (b.w - 32),
+                        y: b.y - 12,
+                        vx: (Math.random() - 0.5) * 2.2,
+                        vy: 2.8,
+                        w: 10,
+                        h: 10,
+                        type: 'pill'
+                    });
+                }
+
+                // Update & collide bullets
+                for (let i = battle.bullets.length - 1; i >= 0; i--) {
+                    const bul = battle.bullets[i];
+                    bul.x += bul.vx;
+                    bul.y += bul.vy;
+
+                    // Pill bounce
+                    if (bul.type === 'pill' && bul.y + bul.h > b.y + b.h - 4 && bul.vy > 0) {
+                        bul.vy = -bul.vy * 0.85;
+                    }
+
+                    // Collision with soul
+                    if (
+                        battle.soul.invuln === 0 &&
+                        bul.x < battle.soul.x + battle.soul.size - 2 &&
+                        bul.x + bul.w > battle.soul.x + 2 &&
+                        bul.y < battle.soul.y + battle.soul.size - 2 &&
+                        bul.y + bul.h > battle.soul.y + 2
+                    ) {
+                        sfxDamage();
+                        triggerScreenShake(false);
+                        battle.soul.invuln = 45;
+                        gameState.playerHP = Math.max(0, gameState.playerHP - 4);
+                        updateHP(gameState.playerHP);
+
+                        if (gameState.playerHP <= 0) {
+                            triggerBattleDefeat();
+                            return;
+                        }
+                    }
+
+                    // Remove out of bounds bullets
+                    if (bul.x < b.x - 40 || bul.x > b.x + b.w + 40 || bul.y < b.y - 40 || bul.y > b.y + b.h + 40) {
+                        battle.bullets.splice(i, 1);
+                    }
+                }
+
+                battle.waveTimer--;
+                if (battle.waveTimer <= 0) {
+                    battle.bullets = [];
+                    openBattleMenu('* Михалыч тяжело дышит и вытирает пот со лба.');
+                }
+            }
+        }
+
+        function triggerBattleDefeat() {
+            battle.phase = 'VICTORY';
+            showChoices(
+                '* У вас закончились ОЗ! Но ваша РЕШИМОСТЬ сильнее смирительной рубашки!',
+                'player_shock',
+                [
+                    {
+                        label: 'Решительно переиграть бой!',
+                        action: () => {
+                            gameState.playerHP = 20;
+                            updateHP(20);
+                            startUndertaleBattle();
+                        }
+                    },
+                    {
+                        label: 'Вернуться в камеру',
+                        action: () => skipToCell()
+                    }
+                ]
+            );
+        }
+
+        function triggerBattleVictory() {
+            sfxVictory();
+            battle.phase = 'VICTORY';
+            startDialogue([
+                {
+                    name: 'САНИТАР МИХАЛЫЧ',
+                    portrait: 'orderly_panic',
+                    voice: 'orderly',
+                    text: '* Ой-ёй... Чё-то в глазах потемнело... Походу давление скакнуло... (Михалыч без сил оседает на пол!)'
+                },
+                {
+                    name: '',
+                    portrait: 'player_doctor',
+                    voice: 'narrator',
+                    text: '* ВЫ ПОБЕДИЛИ! Получено 0 ОП и 1 БЕЛЫЙ МЕДИЦИНСКИЙ ХАЛАТ СО ШТЕФОСКОПОМ! Вы снимаете халат с Михалыча и надеваете на себя!'
+                }
+            ], () => {
+                triggerDoctorCoatEnding();
+            });
+        }
+
+        /* ==========================================
+           ENDINGS: DOCTOR COAT & VEGETABLE
+           ========================================== */
+        function triggerDoctorCoatEnding() {
+            sfxDoorSlam();
+            triggerScreenShake();
+
+            gameState.inBattle = false;
+            gameState.mode = 'POST_BATTLE_CUTSCENE';
+            gameState.doorOpen = false; // Locked inside!
+            gameState.orderlyAtWindow = true;
+            gameState.orderlyInside = true;
+
+            // Mihalych is locked in cell wearing only a telnyashka!
+            orderly.x = 304;
+            orderly.y = 260;
+            orderly.hasCoat = false;
+            orderly.state = 'stripped_locked';
+
+            // Player is outside in corridor wearing stolen Doctor Coat!
+            player.x = 280;
+            player.y = 330;
+            player.dir = 'up';
+            player.hasDoctorCoat = true;
+
+            // Newbie orderly approaches
+            orderly2.x = 340;
+            orderly2.y = 330;
+            orderly2.visible = true;
+            orderly2.isNewbie = true;
+
+            endingsUnlocked.escape = true;
+            updateEndingsCounter();
+
+            startDialogue([
+                {
+                    name: 'ПАЦИЕНТ #404 (В ХАЛАТЕ)',
+                    portrait: 'player_doctor',
+                    voice: 'player',
+                    text: '* (Запирает тяжелый засов снаружи) В психиатрии всё просто, Михалыч: кто первый надел халат — тот и врач!'
+                },
+                {
+                    name: 'МИХАЛЫЧ (ИЗ КАМЕРЫ)',
+                    portrait: 'orderly_panic',
+                    voice: 'orderly',
+                    text: '* (БАМ! БАМ! Колотит в дверь изнутри) ЭЙ!! ВЫПУСТИТЕ МЕНЯ!! Я НЕ ПСИХ, Я САНИТАР МИХАЛЫЧ! ОН У МЕНЯ ХАЛАТ ОТЖАЛ!!'
+                },
+                {
+                    name: 'НОВЕНЬКИЙ САНИТАР',
+                    portrait: 'orderly_normal',
+                    voice: 'orderly',
+                    text: '* Ого, товарищ доктор, какой буйный пациент! Ишь чего выдумал — санитаром себя возомнил! Вколоть ему двойную дозу?'
+                },
+                {
+                    name: 'ДОКТОР #404',
+                    portrait: 'player_doctor',
+                    voice: 'player',
+                    text: '* Обязательно, коллега! Пропишите ему двойную порцию, а я пока пойду домой — у меня смена закончилась!'
+                },
+                {
+                    name: 'ПОБЕДА!',
+                    portrait: 'player_doctor',
+                    voice: 'narrator',
+                    text: '* КОНЦОВКА «КТО В ХАЛАТЕ — ТОТ И ВРАЧ»: Михалыч остался заперт в мягкой одиночке, а вы триумфально вышли на свободу!'
+                }
+            ], () => {
+                showChoices(
+                    '* Вы победили и сбежали из дурдома! Хотите открыть секретную концовку «Овощ»?',
+                    'player_doctor',
+                    [
+                        { label: 'Вернуться в камеру', action: () => skipToCell() },
+                        { label: 'Начать с катсцены', action: () => restartGame() }
+                    ]
+                );
+            });
+        }
+
+        function triggerVegetableEnding() {
+            sfxScream();
+            triggerScreenShake();
+
+            gameState.mode = 'ENDING_VEGETABLE';
+            gameState.doorOpen = true;
+            gameState.orderlyInside = true;
+            orderly2.visible = true;
+
+            orderly.x = 275;
+            orderly.y = 230;
+            orderly.state = 'injecting';
+            orderly2.x = 335;
+            orderly2.y = 230;
+
+            player.x = 304;
+            player.y = 190;
+
+            startDialogue([
+                {
+                    name: 'САНИТАР МИХАЛЫЧ',
+                    portrait: 'orderly_angry',
+                    voice: 'orderly',
+                    text: '* НУ ВСЁ, ДОИГРАЛСЯ! Тарабанит и орёт, тарабанит и орёт! Петрович, доставай «Успокоитин-9000»!'
+                },
+                {
+                    name: '',
+                    portrait: null,
+                    voice: 'narrator',
+                    text: '* Дверь слетает с петель! Санитары зажимают вас в мягком углу со светящимся шприцем размером с бревно!'
+                }
+            ], () => {
+                sfxSyringe();
+                updateHP(1);
+                gameState.isVegetable = true;
+                document.getElementById('app-root').classList.add('drugged-mode');
+
+                endingsUnlocked.vegetable = true;
+                updateEndingsCounter();
+
+                startDialogue([
+                    {
+                        name: 'ПАЦИЕНТ (ОВОЩ)',
+                        portrait: 'player_vegetable',
+                        voice: 'vegetable',
+                        slow: true,
+                        text: '* У-у-у... ы-ы-ы... пускает слюни... какие мягкие обои... бульк... красота...'
+                    },
+                    {
+                        name: 'СЕКРЕТНАЯ КОНЦОВКА ОТКРЫТА!',
+                        portrait: 'player_vegetable',
+                        voice: 'narrator',
+                        text: '* КОНЦОВКА «ОВОЩ»: Вам вкололи предельную дозу. Побег не удался, зато теперь вас вообще ничего в этой жизни не тревожит!'
+                    }
+                ], () => {
+                    showChoices(
+                        '* ИГРА ОКОНЧЕНА (Концовка «Овощ» открыта!). Что дальше?',
+                        'player_vegetable',
+                        [
+                            { label: 'Переиграть в камере', action: () => skipToCell() },
+                            { label: 'С начала (Катсцена)', action: () => restartGame() }
+                        ]
+                    );
+                });
+            });
+        }
+
+        function updateHP(val) {
+            const pct = Math.max(5, (val / 20) * 100);
+            document.getElementById('hp-bar').style.width = pct + '%';
+            document.getElementById('hp-text').textContent = `${val}/20`;
+        }
+
+        function updateEndingsCounter() {
+            const count = (endingsUnlocked.escape ? 1 : 0) + (endingsUnlocked.vegetable ? 1 : 0);
+            const badge = document.getElementById('endings-badge');
+            badge.textContent = `КОНЦОВКИ: ${count}/2`;
+            if (count === 2) {
+                badge.className = 'text-yellow-300 font-bold';
+            }
+        }
+
+        function toggleHintModal() {
+            document.getElementById('hint-modal').classList.toggle('hidden');
+        }
+
+        /* ==========================================
+           MAIN GAME LOOP & CANVAS RENDERING
+           ========================================== */
+        function update() {
+            gameState.tick++;
+
+            // Update dust particles
+            for (let i = gameState.dustParticles.length - 1; i >= 0; i--) {
+                const p = gameState.dustParticles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.alpha -= 0.025;
+                if (p.alpha <= 0) gameState.dustParticles.splice(i, 1);
+            }
+
+            if (gameState.inBattle) {
+                updateBattle();
+                document.getElementById('interact-hint').classList.add('hidden');
+                return;
+            }
+
+            // Smooth orderly entrance cutscene
+            if (gameState.mode === 'CUTSCENE_ORDERLY_ENTER') {
+                updateOrderlyEnterCutscene();
+                return;
+            }
+
+            // Intro drag cutscene movement
+            if (gameState.mode === 'CUTSCENE_DRAG' && gameState.cutsceneStep < 2) {
+                if (player.y > 230) {
+                    player.y -= 0.6;
+                    orderly.y -= 0.6;
+                    orderly2.y -= 0.6;
+                    player.stepFrame = (Math.floor(gameState.tick / 6) % 2);
+                    orderly.stepFrame = (Math.floor(gameState.tick / 6) % 2);
+                }
+            }
+
+            // Player overworld exploration
+            if (gameState.mode === 'EXPLORE') {
+                let dx = joystick.x;
+                let dy = joystick.y;
+                if (keys.left) dx -= 1;
+                if (keys.right) dx += 1;
+                if (keys.up) dy -= 1;
+                if (keys.down) dy += 1;
+
+                player.moving = (dx !== 0 || dy !== 0);
+
+                if (player.moving) {
+                    player.stepTimer++;
+                    if (player.stepTimer % 7 === 0) {
+                        player.stepFrame = (player.stepFrame + 1) % 2;
+                    }
+                    if (Math.abs(dx) > Math.abs(dy)) {
+                        player.dir = dx < 0 ? 'left' : 'right';
+                    } else {
+                        player.dir = dy < 0 ? 'up' : 'down';
+                    }
+                }
+
+                player.x = Math.max(ROOM.left, Math.min(ROOM.right - player.w, player.x + dx * player.speed));
+                player.y = Math.max(ROOM.top, Math.min(ROOM.bottom - player.h, player.y + dy * player.speed));
+
+                // Show interaction hint
+                const target = getNearbyInteractable();
+                const hint = document.getElementById('interact-hint');
+                if (target) {
+                    hint.classList.remove('hidden');
+                    if (target === 'DOOR') hint.textContent = '[Z] ДВЕРЬ КАМЕРЫ';
+                    else if (target === 'WALL_HINT') hint.textContent = '[Z] ШИФР НА СТЕНЕ';
+                    else if (target === 'PILLOW') hint.textContent = '[Z] ОСМОТРЕТЬ ПОДУШКУ';
+                } else {
+                    hint.classList.add('hidden');
+                }
+            } else {
+                document.getElementById('interact-hint').classList.add('hidden');
+            }
+        }
+
+        /* ==========================================
+           OVERWORLD RENDERING (QUILTED CELL & LIGHTS)
+           ========================================== */
+        function drawOverworld() {
+            ctx.fillStyle = '#050508';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Corridor floor below doorway
+            ctx.fillStyle = '#14141e';
+            ctx.fillRect(250, 290, 140, 70);
+            ctx.strokeStyle = '#222233';
+            ctx.lineWidth = 2;
+            for (let y = 300; y < 360; y += 15) {
+                ctx.strokeRect(250, y, 140, 15);
+            }
+
+            // Top Padded Wall (Soft quilted background with tuft buttons)
+            ctx.fillStyle = '#d0d6de';
+            ctx.fillRect(100, 20, 440, 75);
+
+            // Side and top walls border
+            ctx.lineWidth = 6;
+            ctx.strokeStyle = '#ffffff';
+            ctx.strokeRect(100, 20, 440, 280);
+
+            // Quilted pattern on back wall
+            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = '#9ca9b8';
+            for (let x = 100; x < 540; x += 36) {
+                for (let y = 20; y < 95; y += 25) {
+                    ctx.strokeRect(x, y, 36, 25);
+                    // Diamond tuft button
+                    ctx.fillStyle = '#6e7b8c';
+                    ctx.fillRect(x + 16, y + 10, 4, 4);
+                }
+            }
+
+            // Soft quilted floor
+            ctx.fillStyle = '#b8c2ce';
+            ctx.fillRect(103, 95, 434, 202);
+
+            // Quilted floor diamonds
+            ctx.strokeStyle = '#9eaaba';
+            for (let x = 103; x < 537; x += 44) {
+                for (let y = 95; y < 297; y += 38) {
+                    ctx.strokeRect(x, y, 44, 38);
+                    ctx.fillStyle = '#8390a2';
+                    ctx.fillRect(x + 20, y + 17, 4, 4);
+                }
+            }
+
+            // Soft Pillow in top-left corner
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(118, 104, 38, 24);
+            ctx.strokeStyle = '#758292';
+            ctx.strokeRect(118, 104, 38, 24);
+            ctx.fillStyle = '#c8d2dc';
+            ctx.fillRect(124, 112, 26, 8);
+
+            // ==========================================
+            // SECRET WALL HINT: ROMAN NUMERALS & ICONS
+            // ==========================================
+            ctx.fillStyle = '#475363';
+            ctx.fillRect(418, 36, 108, 48);
+            ctx.strokeStyle = '#2d3744';
+            ctx.strokeRect(418, 36, 108, 48);
+
+            // Scratched title
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '6px "Press Start 2P"';
+            ctx.fillText('ШИФР #0 (ОВОЩ)', 424, 46);
+
+            // Roman numerals & icons:
+            // I: Fist (Тарабанить), II: Mouth (Орать), III: Fist, IV: Fist, V: Mouth
+            const cipherSteps = [
+                { num: 'I', icon: '✊' },
+                { num: 'II', icon: '🗣' },
+                { num: 'III', icon: '✊' },
+                { num: 'IV', icon: '✊' },
+                { num: 'V', icon: '🗣' }
+            ];
+
+            cipherSteps.forEach((s, idx) => {
+                const cx = 423 + idx * 20;
+                ctx.fillStyle = '#ffff00';
+                ctx.font = '6px "Press Start 2P"';
+                ctx.fillText(s.num, cx, 58);
+                ctx.font = '9px monospace';
+                ctx.fillText(s.icon, cx - 1, 74);
+            });
+
+            // Doorway rendering at bottom
+            if (!gameState.doorOpen && gameState.mode !== 'CUTSCENE_DRAG') {
+                // Closed heavy steel door
+                ctx.fillStyle = '#37474f';
+                ctx.fillRect(280, 290, 80, 14);
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(280, 290, 80, 14);
+
+                // Small barred window in door
+                ctx.fillStyle = gameState.orderlyAtWindow ? '#f3c192' : '#0d1317';
+                ctx.fillRect(306, 292, 28, 10);
+                ctx.fillStyle = '#90a4ae';
+                ctx.fillRect(314, 292, 2, 10);
+                ctx.fillRect(324, 292, 2, 10);
+
+                if (gameState.orderlyAtWindow) {
+                    ctx.fillStyle = '#000000';
+                    ctx.fillRect(310, 295, 3, 3);
+                    ctx.fillRect(327, 295, 3, 3);
+                }
+            } else {
+                // Open doorway
+                ctx.fillStyle = '#14141e';
+                ctx.fillRect(280, 290, 80, 16);
+                // Swung open steel leaf
+                ctx.fillStyle = '#37474f';
+                ctx.fillRect(360, 294, 12, 42);
+                ctx.strokeStyle = '#ffffff';
+                ctx.strokeRect(360, 294, 12, 42);
+            }
+
+            // Draw Characters in Overworld
+            if (gameState.mode === 'CUTSCENE_DRAG') {
+                drawSpriteMatrix(ctx, SPRITES.orderlyWalk[orderly.stepFrame], PALETTES.orderly, orderly.x, orderly.y, 2);
+                if (orderly2.visible) {
+                    drawSpriteMatrix(ctx, SPRITES.orderlyWalk[orderly.stepFrame], PALETTES.orderly, orderly2.x, orderly2.y, 2);
+                }
+            } else if (gameState.orderlyInside) {
+                const orderlySprite = orderly.hasCoat ? SPRITES.orderlyWalk[orderly.stepFrame] : SPRITES.orderlyTelnyashka;
+                drawSpriteMatrix(ctx, orderlySprite, PALETTES.orderly, orderly.x, orderly.y, 2);
+                if (orderly2.visible) {
+                    drawSpriteMatrix(ctx, SPRITES.orderlyWalk[0], PALETTES.orderly, orderly2.x, orderly2.y, 2);
+                }
+                // Alert icons ('?', '!')
+                if (orderly.alertIcon) {
+                    ctx.fillStyle = orderly.alertIcon === '!' ? '#ff0000' : '#ffff00';
+                    ctx.font = 'bold 16px "Press Start 2P"';
+                    ctx.fillText(orderly.alertIcon, orderly.x + 10, orderly.y - 6);
+                }
+            }
+
+            // Draw Player Sprite
+            const playerSprite = player.hasDoctorCoat ? SPRITES.playerDoctor : SPRITES.playerWalk[player.stepFrame];
+            const flip = player.dir === 'left';
+            drawSpriteMatrix(ctx, playerSprite, PALETTES.player, player.x, player.y, 2, flip);
+
+            // Ambient Light Cone from ceiling fixture
+            const grad = ctx.createRadialGradient(320, 30, 20, 320, 150, 240);
+            grad.addColorStop(0, 'rgba(255, 245, 180, 0.22)');
+            grad.addColorStop(0.5, 'rgba(255, 245, 180, 0.08)');
+            grad.addColorStop(1, 'rgba(0, 0, 0, 0.35)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(100, 20, 440, 280);
+
+            // Door Window light beam
+            if (gameState.doorOpen) {
+                const doorGrad = ctx.createLinearGradient(320, 300, 320, 240);
+                doorGrad.addColorStop(0, 'rgba(255, 255, 200, 0.25)');
+                doorGrad.addColorStop(1, 'rgba(255, 255, 200, 0)');
+                ctx.fillStyle = doorGrad;
+                ctx.fillRect(280, 240, 80, 60);
+            }
+
+            // Render Dust Particles
+            gameState.dustParticles.forEach(p => {
+                ctx.fillStyle = p.color;
+                ctx.globalAlpha = p.alpha;
+                ctx.fillRect(p.x, p.y, p.size, p.size);
+            });
+            ctx.globalAlpha = 1.0;
+        }
+
+        /* ==========================================
+           BATTLE RENDERING (UNDERTALE MONOCHROME BOSS)
+           ========================================== */
+        function drawBattle() {
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Subtle green grid lines
+            ctx.strokeStyle = '#0d2214';
+            ctx.lineWidth = 1;
+            for (let x = 40; x < 600; x += 40) {
+                ctx.strokeRect(x, 10, 40, 150);
+            }
+
+            // Boss Mihalych Breathing Animation
+            const breathHead = Math.sin(gameState.tick * 0.06) * 2;
+            const breathBody = Math.sin(gameState.tick * 0.06 - 0.4) * 1.5;
+            const shake = battle.enemyShake > 0 ? (Math.random() - 0.5) * 12 : 0;
+            const bx = 280 + shake;
+            const by = 20;
+
+            // Boss HP Bar
+            ctx.fillStyle = '#333333';
+            ctx.fillRect(250, 10, 140, 8);
+            ctx.fillStyle = '#00e676';
+            ctx.fillRect(250, 10, Math.max(0, (battle.enemyHP / battle.enemyMaxHP) * 140), 8);
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(250, 10, 140, 8);
+
+            // Boss Name
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '8px "Press Start 2P"';
+            ctx.fillText('САНИТАР МИХАЛЫЧ', 256, 8);
+
+            // Monochrome Undertale Boss Sprite (Detailed parts with breathing)
+            // 1. Torso & White Coat
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(bx - 10, by + 46 + breathBody, 90, 70);
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(bx + 32, by + 46 + breathBody, 6, 70); // Coat lapel line
+            ctx.fillRect(bx + 14, by + 68 + breathBody, 14, 8); // Stethoscope head
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(bx - 10, by + 46 + breathBody, 90, 70);
+
+            // 2. Arms (Left with giant glowing syringe, Right with brass keys)
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(bx - 26, by + 50 + breathBody, 16, 44); // Left arm
+            ctx.fillRect(bx + 80, by + 50 + breathBody, 16, 44); // Right arm
+            ctx.strokeRect(bx - 26, by + 50 + breathBody, 16, 44);
+            ctx.strokeRect(bx + 80, by + 50 + breathBody, 16, 44);
+
+            // Giant Syringe in left hand
+            ctx.fillStyle = '#76ff03';
+            ctx.fillRect(bx - 36, by + 30 + breathBody, 10, 48);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(bx - 34, by + 18 + breathBody, 6, 12);
+            ctx.strokeRect(bx - 36, by + 30 + breathBody, 10, 48);
+
+            // Brass Keys on belt
+            ctx.fillStyle = '#ffd700';
+            ctx.fillRect(bx + 74, by + 86 + breathBody, 12, 12);
+            ctx.strokeRect(bx + 74, by + 86 + breathBody, 12, 12);
+
+            // 3. Head & Medical Cap
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(bx + 6, by + 14 + breathHead, 58, 36);
+            ctx.strokeRect(bx + 6, by + 14 + breathHead, 58, 36);
+
+            // Cap
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(bx + 10, by + 2 + breathHead, 50, 14);
+            ctx.fillStyle = '#e53935';
+            ctx.fillRect(bx + 32, by + 4 + breathHead, 6, 10);
+            ctx.fillRect(bx + 28, by + 7 + breathHead, 14, 4);
+
+            // Face details based on battle status
+            ctx.fillStyle = '#000000';
+            if (battle.phase === 'SLASH_ANIM') {
+                // Hurt grimace
+                ctx.fillRect(bx + 18, by + 24 + breathHead, 12, 4);
+                ctx.fillRect(bx + 40, by + 24 + breathHead, 12, 4);
+                ctx.fillRect(bx + 26, by + 36 + breathHead, 18, 6);
+            } else if (battle.enemyDefDown) {
+                // Shocked / confused face
+                ctx.fillRect(bx + 16, by + 22 + breathHead, 8, 8);
+                ctx.fillRect(bx + 44, by + 22 + breathHead, 8, 8);
+                ctx.fillRect(bx + 28, by + 36 + breathHead, 14, 8);
+            } else {
+                // Frowning grim face
+                ctx.fillRect(bx + 16, by + 24 + breathHead, 14, 5);
+                ctx.fillRect(bx + 40, by + 24 + breathHead, 14, 5);
+                ctx.fillRect(bx + 20, by + 30 + breathHead, 6, 6);
+                ctx.fillRect(bx + 44, by + 30 + breathHead, 6, 6);
+                ctx.fillRect(bx + 18, by + 38 + breathHead, 34, 6); // mustache
+            }
+
+            // Slash Effect Animation
+            if (battle.phase === 'SLASH_ANIM') {
+                ctx.strokeStyle = '#ff1744';
+                ctx.lineWidth = 6;
+                ctx.beginPath();
+                ctx.moveTo(bx - 10, by + 10);
+                ctx.lineTo(bx + 85, by + 115);
+                ctx.stroke();
+            }
+
+            // Damage Popups
+            battle.damagePopups.forEach(p => {
+                ctx.fillStyle = '#ff1744';
+                ctx.font = 'bold 20px "Press Start 2P"';
+                ctx.fillText(p.text, p.x - 20, p.y);
+            });
+
+            // Undertale Arena Box
+            const b = battle.box;
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(b.x, b.y, b.w, b.h);
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(b.x, b.y, b.w, b.h);
+
+            // Phase: Attack timing bar
+            if (battle.phase === 'ATTACK_BAR') {
+                const mx = b.x + 14;
+                const my = b.y + 40;
+                const mw = b.w - 28;
+                const mh = 65;
+
+                ctx.fillStyle = '#b71c1c';
+                ctx.fillRect(mx, my, mw, mh);
+                ctx.fillStyle = '#f57f17';
+                ctx.fillRect(mx + mw * 0.25, my, mw * 0.5, mh);
+                ctx.fillStyle = '#00e676';
+                ctx.fillRect(mx + mw * 0.42, my, mw * 0.16, mh);
+
+                const curX = mx + battle.barCursor * mw;
+                ctx.fillStyle = (Math.floor(gameState.tick / 3) % 2 === 0) ? '#ffffff' : '#ffff00';
+                ctx.fillRect(curX - 4, my - 6, 8, mh + 12);
+            } else if (battle.phase === 'DODGE') {
+                // Red Soul Heart
+                if (battle.soul.invuln % 4 < 2) {
+                    const sx = battle.soul.x;
+                    const sy = battle.soul.y;
+                    ctx.fillStyle = '#ff0000';
+                    ctx.fillRect(sx + 2, sy, 5, 5);
+                    ctx.fillRect(sx + 9, sy, 5, 5);
+                    ctx.fillRect(sx, sy + 3, 16, 7);
+                    ctx.fillRect(sx + 2, sy + 10, 12, 3);
+                    ctx.fillRect(sx + 4, sy + 13, 8, 2);
+                    ctx.fillRect(sx + 7, sy + 15, 2, 2);
+                }
+
+                // Render Bullets
+                battle.bullets.forEach(bul => {
+                    if (bul.type === 'syringe') {
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(bul.x, bul.y, bul.w, bul.h);
+                        ctx.fillStyle = '#76ff03';
+                        ctx.fillRect(bul.x + 4, bul.y + 2, bul.w - 8, bul.h - 4);
+                    } else if (bul.type === 'pill') {
+                        ctx.fillStyle = '#ff5252';
+                        ctx.fillRect(bul.x, bul.y, bul.w / 2, bul.h);
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(bul.x + bul.w / 2, bul.y, bul.w / 2, bul.h);
+                    }
+                });
+            } else {
+                // Heart prompt inside box
+                ctx.fillStyle = '#ff0000';
+                ctx.font = '14px "Press Start 2P"';
+                ctx.fillText('♥', b.x + b.w / 2 - 7, b.y + b.h / 2 + 5);
+            }
+        }
+
+        function render() {
+            if (gameState.inBattle) {
+                drawBattle();
+            } else {
+                drawOverworld();
+            }
+        }
+
+        function gameLoop() {
+            update();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+
+        window.onload = () => {
+            restartGame();
+            gameLoop();
+        };
+    </script>
+</body>
+</html>
