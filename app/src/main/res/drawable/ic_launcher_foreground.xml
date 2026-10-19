@@ -4,23 +4,22 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Heart drop shadow -->
+    <!-- Golden Shield / Financial Vault -->
     <path
-        android:fillColor="#55000000"
-        android:pathData="M38,36h14v6h-14z M58,36h14v6h-14z M32,42h46v14h-46z M38,56h34v8h-34z M44,64h22v8h-22z M50,72h10v6h-10z" />
-    
-    <!-- Undertale Red Soul Heart (Pixelated blocks) -->
+        android:fillColor="#00E676"
+        android:pathData="M54,28 L78,38 C78,60 54,78 54,78 C54,78 30,60 30,38 Z" />
     <path
-        android:fillColor="#FF1744"
-        android:pathData="M36,33h14v7h-14z M56,33h14v7h-14z M30,39h46v15h-46z M36,54h34v8h-34z M42,62h22v8h-22z M48,70h10v7h-10z" />
-    
-    <!-- Inner Heart Highlight -->
+        android:fillColor="#00B0FF"
+        android:pathData="M54,34 L72,42 C72,58 54,72 54,72 Z" />
+    <!-- AI Sparkle & Currency Sign -->
     <path
-        android:fillColor="#FF8A80"
-        android:pathData="M38,35h8v4h-8z M33,41h8v8h-8z" />
-
-    <!-- Golden Key of Freedom overlay -->
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,42 C49.5,42 46,45.5 46,50 C46,54.5 49.5,58 54,58 C58.5,58 62,54.5 62,50 C62,45.5 58.5,42 54,42 Z" />
+    <path
+        android:fillColor="#0D1B2A"
+        android:pathData="M54,45 C51.8,45 50,46.8 50,49 C50,51.2 51.8,53 54,53 C56.2,53 58,51.2 58,49 C58,46.8 56.2,45 54,45 Z" />
+    <!-- AI Star at top right -->
     <path
         android:fillColor="#FFD700"
-        android:pathData="M66,60h16v6h-16z M76,66h6v4h-6z M70,66h4v3h-4z M60,56h8v14h-8z M62,58h4v10h-4z" />
+        android:pathData="M76,28 L78,33 L83,35 L78,37 L76,42 L74,37 L69,35 L74,33 Z" />
 </vector>

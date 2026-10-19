@@ -1,6 +1,6 @@
 {
-  "name": "Durotale",
-  "description": "Ретро-игра в стиле Undertale: Побег из дурки от санитара Михалыча с пошаговыми битвами, звуковыми эффектами и секретными концовками.",
+  "name": "Finance David",
+  "description": "Управление личными финансами, бюджетом, расходами и умный ИИ-ассистент Дэвид на базе Gemini API.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

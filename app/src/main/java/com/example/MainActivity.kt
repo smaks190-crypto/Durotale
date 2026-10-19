@@ -1,266 +1,294 @@
 package com.example
 
 import android.os.Bundle
-import android.view.KeyEvent
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.PieChart
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.model.GameMode
-import com.example.ui.components.HintsDialog
-import com.example.ui.components.RetroCanvasView
-import com.example.ui.components.RetroControls
-import com.example.ui.components.RetroDialogueBox
-import com.example.ui.components.RetroHUD
-import com.example.ui.components.UndertaleBattleView
-import com.example.ui.theme.MyApplicationTheme
-import com.example.ui.theme.RetroBlack
-import com.example.viewmodel.DurotaleViewModel
-import kotlin.random.Random
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.ui.components.VoiceInputMorphingFab
+import com.example.ui.dialogs.AddTransactionDialog
+import com.example.ui.dialogs.SetBudgetDialog
+import com.example.ui.screens.AiAssistantScreen
+import com.example.ui.screens.BudgetsScreen
+import com.example.ui.screens.DashboardScreen
+import com.example.ui.screens.TransactionsScreen
+import com.example.ui.theme.EmeraldLight
+import com.example.ui.theme.EmeraldPrimary
+import com.example.ui.theme.FinanceDavidTheme
+import com.example.ui.theme.PurpleAccent
+import com.example.ui.theme.SlateSurfaceDark
+import com.example.ui.theme.TextPrimaryDark
+import com.example.ui.theme.TextSecondaryDark
+import com.example.viewmodel.FinanceUiState
+import com.example.viewmodel.FinanceViewModel
+import com.example.viewmodel.NavigationTab
 
 class MainActivity : ComponentActivity() {
-    private val viewModel: DurotaleViewModel by viewModels()
+
+    private val viewModel: FinanceViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
         setContent {
-            MyApplicationTheme {
-                Scaffold(
-                    modifier = Modifier.fillMaxSize(),
-                    containerColor = RetroBlack
-                ) { innerPadding ->
-                    DurotaleGameScreen(
-                        viewModel = viewModel,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(innerPadding)
-                    )
-                }
+            FinanceDavidTheme {
+                val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+                FinanceApp(
+                    state = uiState,
+                    viewModel = viewModel
+                )
             }
         }
-    }
-
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        when (keyCode) {
-            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_W -> {
-                viewModel.inputUp = true
-                return true
-            }
-            KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_S -> {
-                viewModel.inputDown = true
-                return true
-            }
-            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_A -> {
-                viewModel.inputLeft = true
-                return true
-            }
-            KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_D -> {
-                viewModel.inputRight = true
-                return true
-            }
-            KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_Z, KeyEvent.KEYCODE_SPACE -> {
-                viewModel.handleConfirm()
-                return true
-            }
-            KeyEvent.KEYCODE_X, KeyEvent.KEYCODE_ESCAPE, KeyEvent.KEYCODE_SHIFT_LEFT, KeyEvent.KEYCODE_SHIFT_RIGHT -> {
-                viewModel.handleCancel()
-                return true
-            }
-        }
-        return super.onKeyDown(keyCode, event)
-    }
-
-    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
-        when (keyCode) {
-            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_W -> {
-                viewModel.inputUp = false
-                return true
-            }
-            KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_S -> {
-                viewModel.inputDown = false
-                return true
-            }
-            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_A -> {
-                viewModel.inputLeft = false
-                return true
-            }
-            KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_D -> {
-                viewModel.inputRight = false
-                return true
-            }
-        }
-        return super.onKeyUp(keyCode, event)
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DurotaleGameScreen(
-    viewModel: DurotaleViewModel,
-    modifier: Modifier = Modifier
+fun FinanceApp(
+    state: FinanceUiState,
+    viewModel: FinanceViewModel
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    // Screen Shake effect
-    val shakeOffset = if (state.screenShakeTick > 0) {
-        IntOffset(
-            x = Random.nextInt(-8, 9),
-            y = Random.nextInt(-8, 9)
-        )
-    } else {
-        IntOffset.Zero
+    BackHandler(enabled = state.isVoiceInputActive) {
+        viewModel.stopVoiceSession()
     }
 
-    // Drugged wave transition for Secret Ending «Овощ»
-    val infiniteTransition = rememberInfiniteTransition(label = "drugged_anim")
-    val druggedWobble by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 6f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "wobble"
-    )
-
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(RetroBlack)
-            .offset { shakeOffset }
-            .then(if (state.isDruggedMode) Modifier.blur((druggedWobble * 0.3f).dp) else Modifier),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .widthIn(max = 680.dp)
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Top HUD
-            RetroHUD(
-                playerHP = state.playerHP,
-                maxHP = state.maxHP,
-                endingsCount = state.endingsUnlocked.size,
-                isMuted = state.isMuted,
-                doorCombo = state.doorActionHistory,
-                onToggleMute = { viewModel.toggleMute() },
-                onResetCell = { viewModel.skipToCell() }
-            )
-
-            // Main Visual View: Overworld Canvas or Undertale Battle Screen
-            Box(
-                modifier = Modifier
-                    .weight(1f, fill = false)
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                if (state.mode == GameMode.BATTLE) {
-                    UndertaleBattleView(
-                        battle = state.battle,
-                        tick = state.tick,
-                        onSoulPositionChanged = { x, y -> viewModel.setSoulPosition(x, y) }
-                    )
-                } else {
-                    RetroCanvasView(
-                        mode = state.mode,
-                        player = state.player,
-                        orderly = state.orderly,
-                        orderly2 = state.orderly2,
-                        orderly2Visible = state.orderly2Visible,
-                        doorOpen = state.doorOpen,
-                        orderlyAtWindow = state.orderlyAtWindow,
-                        orderlyInside = state.orderlyInside,
-                        isVegetable = state.isVegetable,
-                        dustParticles = state.dustParticles,
-                        screenShakeTick = state.screenShakeTick,
-                        screenShakeIntensity = state.screenShakeIntensity,
-                        interactPrompt = state.interactPrompt,
-                        tick = state.tick
-                    )
-                }
-            }
-
-            // Dialogue & Choice Box
-            RetroDialogueBox(
-                speaker = state.currentSpeaker,
-                portrait = state.currentPortrait,
-                dialogueText = state.displayedDialogueText,
-                choices = state.choices,
-                selectedChoiceIndex = state.selectedChoiceIndex,
-                canAdvanceDialogue = state.canAdvanceDialogue,
-                onChoiceSelected = { idx -> viewModel.selectChoiceByIndex(idx) },
-                onAdvanceClick = { viewModel.handleConfirm() }
-            )
-
-            // Bottom On-Screen Controls
-            RetroControls(
-                onUpChange = { viewModel.inputUp = it },
-                onDownChange = { viewModel.inputDown = it },
-                onLeftChange = { viewModel.inputLeft = it },
-                onRightChange = { viewModel.inputRight = it },
-                onConfirm = { viewModel.handleConfirm() },
-                onCancel = { viewModel.handleCancel() },
-                onToggleHints = { viewModel.toggleHintsModal() }
-            )
+    LaunchedEffect(state.userNotification) {
+        state.userNotification?.let { msg ->
+            snackbarHostState.showSnackbar(msg)
+            viewModel.dismissNotification()
         }
+    }
 
-        // Retro CRT scanline lines overlay
-        Canvas(
-            modifier = Modifier
-                .fillMaxSize()
-                .testTag("crt_overlay")
-        ) {
-            val step = 4.dp.toPx()
-            var y = 0f
-            while (y < size.height) {
-                drawLine(
-                    color = Color(0x18000000),
-                    start = Offset(0f, y),
-                    end = Offset(size.width, y),
-                    strokeWidth = 1.5f
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        text = when (state.selectedTab) {
+                            NavigationTab.DASHBOARD -> "Главная"
+                            NavigationTab.TRANSACTIONS -> "Операции"
+                            NavigationTab.BUDGETS -> "Бюджет"
+                            NavigationTab.AI_ASSISTANT -> "Ассистент Дэвид"
+                        },
+                        color = TextPrimaryDark,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 19.sp
+                    )
+                },
+                actions = {
+                    if (state.selectedTab == NavigationTab.AI_ASSISTANT) {
+                        Box(
+                            modifier = Modifier
+                                .padding(end = 16.dp)
+                                .background(PurpleAccent.copy(alpha = 0.2f), shape = RoundedCornerShape(12.dp))
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Gemini Flash",
+                                color = EmeraldLight,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = SlateSurfaceDark
                 )
-                y += step
+            )
+        },
+        bottomBar = {
+            NavigationBar(
+                containerColor = SlateSurfaceDark,
+                contentColor = TextPrimaryDark,
+                tonalElevation = 8.dp
+            ) {
+                NavigationBarItem(
+                    selected = state.selectedTab == NavigationTab.DASHBOARD,
+                    onClick = { viewModel.selectTab(NavigationTab.DASHBOARD) },
+                    icon = { Icon(Icons.Default.Dashboard, contentDescription = "Dashboard") },
+                    label = { Text("Дашборд", fontSize = 11.sp) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = Color(0xFF0F172A),
+                        selectedTextColor = EmeraldLight,
+                        indicatorColor = EmeraldPrimary,
+                        unselectedIconColor = TextSecondaryDark,
+                        unselectedTextColor = TextSecondaryDark
+                    )
+                )
+
+                NavigationBarItem(
+                    selected = state.selectedTab == NavigationTab.TRANSACTIONS,
+                    onClick = { viewModel.selectTab(NavigationTab.TRANSACTIONS) },
+                    icon = { Icon(Icons.AutoMirrored.Filled.ReceiptLong, contentDescription = "Transactions") },
+                    label = { Text("Операции", fontSize = 11.sp) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = Color(0xFF0F172A),
+                        selectedTextColor = EmeraldLight,
+                        indicatorColor = EmeraldPrimary,
+                        unselectedIconColor = TextSecondaryDark,
+                        unselectedTextColor = TextSecondaryDark
+                    )
+                )
+
+                NavigationBarItem(
+                    selected = state.selectedTab == NavigationTab.BUDGETS,
+                    onClick = { viewModel.selectTab(NavigationTab.BUDGETS) },
+                    icon = { Icon(Icons.Default.PieChart, contentDescription = "Budgets") },
+                    label = { Text("Бюджет", fontSize = 11.sp) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = Color(0xFF0F172A),
+                        selectedTextColor = EmeraldLight,
+                        indicatorColor = EmeraldPrimary,
+                        unselectedIconColor = TextSecondaryDark,
+                        unselectedTextColor = TextSecondaryDark
+                    )
+                )
+
+                NavigationBarItem(
+                    selected = state.selectedTab == NavigationTab.AI_ASSISTANT,
+                    onClick = { viewModel.selectTab(NavigationTab.AI_ASSISTANT) },
+                    icon = { Icon(Icons.Default.AutoAwesome, contentDescription = "David AI") },
+                    label = { Text("Дэвид ИИ", fontSize = 11.sp) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = Color(0xFF0F172A),
+                        selectedTextColor = EmeraldLight,
+                        indicatorColor = EmeraldPrimary,
+                        unselectedIconColor = TextSecondaryDark,
+                        unselectedTextColor = TextSecondaryDark
+                    )
+                )
             }
         }
+    ) { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            when (state.selectedTab) {
+                NavigationTab.DASHBOARD -> DashboardScreen(
+                    state = state,
+                    onNavigateToTab = { viewModel.selectTab(it) },
+                    onOpenAddTransaction = { viewModel.openAddTransaction() },
+                    onAskDavid = {
+                        viewModel.selectTab(NavigationTab.AI_ASSISTANT)
+                        viewModel.sendChatMessage(it)
+                    }
+                )
+                NavigationTab.TRANSACTIONS -> TransactionsScreen(
+                    state = state,
+                    onSearchQueryChange = { viewModel.setSearchQuery(it) },
+                    onTypeFilterChange = { viewModel.setTypeFilter(it) },
+                    onCategoryFilterChange = { viewModel.setCategoryFilter(it) },
+                    onDeleteTransaction = { viewModel.deleteTransaction(it) }
+                )
+                NavigationTab.BUDGETS -> BudgetsScreen(
+                    state = state,
+                    onOpenSetBudget = { viewModel.openSetBudget(it) },
+                    onDeleteBudget = { viewModel.deleteBudget(it) }
+                )
+                NavigationTab.AI_ASSISTANT -> AiAssistantScreen(
+                    state = state,
+                    onInputTextChange = { viewModel.setChatInput(it) },
+                    onSendMessage = { viewModel.sendChatMessage(it) },
+                    onConfirmParsedTransaction = { viewModel.confirmParsedTransaction(it) },
+                    onDismissParsedTransaction = { viewModel.dismissParsedTransaction() }
+                )
+            }
 
-        // Hints Dialog
-        if (state.showHintsModal) {
-            HintsDialog(
-                onDismiss = { viewModel.toggleHintsModal() },
-                onRestartIntro = { viewModel.restartFullGame() }
-            )
+            // Morphing Floating Action Button / Voice Input Capsule
+            val showMorphingFab = state.isVoiceInputActive ||
+                    state.selectedTab == NavigationTab.DASHBOARD ||
+                    state.selectedTab == NavigationTab.TRANSACTIONS
+
+            if (showMorphingFab) {
+                VoiceInputMorphingFab(
+                    isVoiceActive = state.isVoiceInputActive,
+                    isListening = state.isVoiceListening,
+                    rmsLevel = state.voiceRmsLevel,
+                    liveText = state.liveVoiceText,
+                    parsedOperations = state.parsedVoiceOperations,
+                    onStartVoice = { viewModel.startVoiceSession() },
+                    onStopVoice = { viewModel.stopVoiceSession() },
+                    onOpenManualAdd = { viewModel.openAddTransaction() },
+                    onRmsChanged = { viewModel.updateVoiceRms(it) },
+                    onStatusChanged = { viewModel.updateVoiceStatus(it) },
+                    onPartialText = { viewModel.onVoicePartialText(it) },
+                    onFinalText = { viewModel.onVoiceFinalText(it) },
+                    onRemoveItem = { viewModel.removeParsedVoiceItem(it) },
+                    onSaveBatch = { viewModel.saveBatchVoiceOperations() },
+                    onError = { viewModel.showNotification(it) },
+                    modifier = Modifier.align(
+                        if (state.isVoiceInputActive) Alignment.BottomCenter else Alignment.BottomEnd
+                    )
+                )
+            }
         }
+    }
+
+    // Add Transaction Dialog
+    if (state.isAddTransactionOpen) {
+        AddTransactionDialog(
+            categories = state.categories,
+            initialDraft = state.draftForAddTransaction,
+            onDismiss = { viewModel.closeAddTransaction() },
+            onSave = { title, amount, type, categoryId, date, note ->
+                viewModel.saveTransaction(title, amount, type, categoryId, date, note)
+            }
+        )
+    }
+
+    // Set Budget Dialog
+    if (state.isSetBudgetOpen) {
+        SetBudgetDialog(
+            categories = state.categories,
+            initialCategory = state.selectedCategoryForBudget,
+            onDismiss = { viewModel.closeSetBudget() },
+            onSave = { categoryId, limit ->
+                viewModel.saveBudget(categoryId, limit)
+            }
+        )
     }
 }
