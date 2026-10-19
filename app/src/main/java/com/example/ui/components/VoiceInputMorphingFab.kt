@@ -7,10 +7,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
@@ -19,6 +20,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -44,14 +46,13 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.MicNone
+import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -61,13 +62,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -111,8 +113,9 @@ fun VoiceInputMorphingFab(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
 
-    // Permission launcher for audio recording
+    // Audio permission request launcher
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -136,7 +139,7 @@ fun VoiceInputMorphingFab(
         }
     }
 
-    // Lifecycle manager for SpeechRecognizer
+    // Lifecycle manager for speech recognition
     val speechManager = remember {
         SpeechRecognitionManager(
             context = context,
@@ -159,90 +162,71 @@ fun VoiceInputMorphingFab(
         }
     }
 
-    val neonGradient = remember {
-        Brush.horizontalGradient(
-            colors = listOf(NeonEmerald, NeonIndigo, NeonRose)
-        )
-    }
-
-    val pulseTransition = rememberInfiniteTransition(label = "pulse")
-    val pulseScale by pulseTransition.animateFloat(
-        initialValue = 0.95f,
-        targetValue = 1.08f,
+    // Continuous flowing neon border gradient
+    val infiniteBorderTransition = rememberInfiniteTransition(label = "InfiniteBorderFlow")
+    val borderPhase by infiniteBorderTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(900, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
+            animation = tween(3000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
         ),
-        label = "pulseScale"
+        label = "borderPhase"
+    )
+
+    val neonBorderBrush = Brush.sweepGradient(
+        listOf(
+            NeonEmerald,
+            NeonIndigo,
+            NeonCyan,
+            NeonRose,
+            NeonEmerald
+        )
     )
 
     AnimatedContent(
         targetState = isVoiceActive,
         transitionSpec = {
-            fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(200))
+            fadeIn(animationSpec = tween(320)) togetherWith fadeOut(animationSpec = tween(220))
         },
-        label = "FabToVoiceCardMorph"
+        label = "FabToVoiceCapsuleMorph"
     ) { active ->
         if (!active) {
-            // Standard / Morphable Floating Action Button
-            Row(
-                modifier = modifier.padding(end = 16.dp, bottom = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Secondary quick Voice Button
-                Surface(
-                    onClick = { requestVoiceSession() },
-                    shape = CircleShape,
-                    color = SlateCardDark,
-                    border = BorderStroke(1.dp, NeonIndigo.copy(alpha = 0.5f)),
-                    shadowElevation = 6.dp,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .testTag("voice_trigger_button")
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.Mic,
-                            contentDescription = "Voice Input",
-                            tint = NeonCyan,
-                            modifier = Modifier.size(24.dp)
+            // 1. Clean Circular Neon FAB (no micro-mic badge)
+            Box(
+                modifier = modifier
+                    .padding(end = 20.dp, bottom = 20.dp)
+                    .shadow(elevation = 12.dp, shape = CircleShape)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(NeonIndigo, NeonEmerald)
                         )
-                    }
-                }
-
-                // Primary '+' button with LongPress support to talk
-                Box(
-                    modifier = Modifier
-                        .shadow(elevation = 10.dp, shape = CircleShape)
-                        .clip(CircleShape)
-                        .background(
-                            Brush.linearGradient(
-                                colors = listOf(NeonIndigo, NeonEmerald)
-                            )
-                        )
-                        .combinedClickable(
-                            onClick = { onOpenManualAdd() },
-                            onLongClick = { requestVoiceSession() }
-                        )
-                        .padding(14.dp)
-                        .testTag("add_transaction_fab"),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Add Transaction or Hold for Voice",
-                        tint = Color(0xFF0F172A),
-                        modifier = Modifier.size(28.dp)
                     )
-                }
+                    .combinedClickable(
+                        onClick = { onOpenManualAdd() },
+                        onLongClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            requestVoiceSession()
+                        }
+                    )
+                    .padding(16.dp)
+                    .testTag("add_transaction_fab"),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Add Transaction or Hold for Voice",
+                    tint = Color(0xFF0F172A),
+                    modifier = Modifier.size(28.dp)
+                )
             }
         } else {
-            // Expanded Bottom Capsule Card with dynamic spring sizing
+            // 2. Compact Voice Input Capsule with dynamic upward spring growth
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .padding(horizontal = 14.dp, vertical = 8.dp)
                     .navigationBarsPadding()
                     .animateContentSize(
                         animationSpec = spring(
@@ -255,42 +239,114 @@ fun VoiceInputMorphingFab(
                 colors = CardDefaults.cardColors(
                     containerColor = SlateSurfaceDark
                 ),
-                border = BorderStroke(1.5.dp, neonGradient),
-                elevation = CardDefaults.cardElevation(defaultElevation = 14.dp)
+                border = BorderStroke(1.5.dp, neonBorderBrush),
+                elevation = CardDefaults.cardElevation(defaultElevation = 16.dp)
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp)
+                        .padding(horizontal = 16.dp, vertical = 14.dp)
                 ) {
-                    // Header Row: Status, Title, and Close Button
+                    // Header Row: Mic with pulsating halo | Realtime Text + Glowing Bar | Close Button
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        // Left: Mic Button with expanding pulsating neon halo
+                        val haloAlpha by animateFloatAsState(
+                            targetValue = if (isListening) (0.25f + rmsLevel * 0.7f).coerceIn(0f, 0.95f) else 0f,
+                            animationSpec = spring(stiffness = 500f),
+                            label = "haloAlpha"
+                        )
+                        val haloRadiusScale by animateFloatAsState(
+                            targetValue = if (isListening) (1f + rmsLevel * 0.45f) else 1f,
+                            animationSpec = spring(stiffness = 450f),
+                            label = "haloRadius"
+                        )
+
+                        Box(
+                            modifier = Modifier.size(48.dp),
+                            contentAlignment = Alignment.Center
                         ) {
-                            // Pulsing Mic Indicator
-                            Box(
+                            // Pulsating glowing neon aura
+                            Canvas(modifier = Modifier.size(48.dp)) {
+                                if (isListening && haloAlpha > 0f) {
+                                    drawCircle(
+                                        brush = Brush.radialGradient(
+                                            colors = listOf(
+                                                NeonCyan.copy(alpha = haloAlpha),
+                                                NeonEmerald.copy(alpha = haloAlpha * 0.6f),
+                                                Color.Transparent
+                                            )
+                                        ),
+                                        radius = (size.minDimension / 2f) * haloRadiusScale,
+                                        center = Offset(size.width / 2f, size.height / 2f)
+                                    )
+                                }
+                            }
+
+                            // Clickable mic toggle (pause / resume)
+                            IconButton(
+                                onClick = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    speechManager.toggleListening()
+                                },
                                 modifier = Modifier
-                                    .size(10.dp)
-                                    .scale(if (isListening) pulseScale else 1f)
+                                    .size(42.dp)
+                                    .clip(CircleShape)
                                     .background(
-                                        if (isListening) NeonEmerald else NeonRose,
+                                        if (isListening) NeonIndigo.copy(alpha = 0.25f) else SlateCardDark
+                                    )
+                                    .border(
+                                        width = 1.2.dp,
+                                        color = if (isListening) NeonEmerald else SlateBorderDark,
                                         shape = CircleShape
                                     )
-                            )
+                                    .testTag("toggle_voice_mic_button")
+                            ) {
+                                Icon(
+                                    imageVector = if (isListening) Icons.Default.Mic else Icons.Default.MicOff,
+                                    contentDescription = if (isListening) "Pause Listening" else "Resume Listening",
+                                    tint = if (isListening) NeonEmerald else TextMutedDark,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        // Center: Live transcribed text & Moving Neon Glow Visualizer
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(vertical = 2.dp),
+                            verticalArrangement = Arrangement.Center
+                        ) {
                             Text(
-                                text = "Живой голосовой ввод",
-                                color = TextPrimaryDark,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp
+                                text = if (liveText.isNotBlank()) liveText else if (isListening) "Слушаю вас..." else "Запись на паузе",
+                                color = if (liveText.isNotBlank()) NeonCyan else TextPrimaryDark,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 14.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            // 10.dp Moving Neon Glow Visualizer
+                            MovingNeonGlowVisualizer(
+                                voiceLevel = rmsLevel,
+                                isListening = isListening,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(10.dp)
                             )
                         }
 
+                        Spacer(modifier = Modifier.width(10.dp))
+
+                        // Right: Compact Close Button
                         IconButton(
                             onClick = { onStopVoice() },
                             modifier = Modifier
@@ -308,13 +364,20 @@ fun VoiceInputMorphingFab(
 
                     // Dynamically Expanding List of Parsed Operations
                     if (parsedOperations.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(
-                            text = "Распознанные операции (${parsedOperations.size}):",
-                            color = NeonEmerald,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "ГОТОВО К ДОБАВЛЕНИЮ (${parsedOperations.size})",
+                                color = NeonEmerald,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.5.sp
+                            )
+                        }
                         Spacer(modifier = Modifier.height(6.dp))
 
                         LazyColumn(
@@ -330,90 +393,49 @@ fun VoiceInputMorphingFab(
                                 )
                             }
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Live Speech Transcription Text
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(
-                                color = SlateCardDark.copy(alpha = 0.7f),
-                                shape = RoundedCornerShape(12.dp)
-                            )
-                            .padding(horizontal = 12.dp, vertical = 8.dp)
-                    ) {
-                        Text(
-                            text = if (liveText.isNotBlank()) "«$liveText»" else "Говорите: «Такси 500 рублей, кофе 250, зарплата 50000»...",
-                            color = if (liveText.isNotBlank()) NeonCyan else TextMutedDark,
-                            fontSize = 13.sp,
-                            fontStyle = FontStyle.Italic,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Neon Waveform Visualizer
-                    WaveformVisualizer(
-                        rmsLevel = rmsLevel,
-                        isListening = isListening,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(44.dp)
-                    )
-
-                    // Save Batch Button if operations parsed
-                    AnimatedVisibility(
-                        visible = parsedOperations.isNotEmpty(),
-                        enter = fadeIn() + androidx.compose.animation.expandVertically(),
-                        exit = fadeOut() + androidx.compose.animation.shrinkVertically()
-                    ) {
+                        // Big Save Button
                         val totalAmount = parsedOperations.sumOf { it.amount }
-                        Column {
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Button(
-                                onClick = { onSaveBatch() },
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = { onSaveBatch() },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
+                                .testTag("save_voice_batch_button"),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color.Transparent
+                            ),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(48.dp)
-                                    .testTag("save_voice_batch_button"),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color.Transparent
-                                ),
-                                contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
-                                shape = RoundedCornerShape(14.dp)
+                                    .background(
+                                        Brush.horizontalGradient(
+                                            listOf(NeonEmerald, NeonIndigo)
+                                        )
+                                    ),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(48.dp)
-                                        .background(
-                                            Brush.horizontalGradient(
-                                                listOf(NeonEmerald, NeonIndigo)
-                                            )
-                                        ),
-                                    contentAlignment = Alignment.Center
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Check,
-                                            contentDescription = null,
-                                            tint = Color(0xFF0F172A),
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                        Text(
-                                            text = "Сохранить (${parsedOperations.size}) • ${formatMoney(totalAmount)} ₽",
-                                            color = Color(0xFF0F172A),
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 15.sp
-                                        )
-                                    }
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = Color(0xFF0F172A),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Text(
+                                        text = "Сохранить (${parsedOperations.size}) • ${formatMoney(totalAmount)} ₽",
+                                        color = Color(0xFF0F172A),
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 15.sp
+                                    )
                                 }
                             }
                         }

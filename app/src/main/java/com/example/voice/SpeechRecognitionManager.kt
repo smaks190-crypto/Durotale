@@ -9,7 +9,6 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.util.Log
-import java.util.Locale
 
 class SpeechRecognitionManager(
     private val context: Context,
@@ -24,10 +23,13 @@ class SpeechRecognitionManager(
     private val mainHandler = Handler(Looper.getMainLooper())
     private var isSessionActive = false
     private var isCurrentlyListening = false
+    private var isPausedByUser = false
 
     fun isAvailable(): Boolean {
         return SpeechRecognizer.isRecognitionAvailable(context)
     }
+
+    fun isListening(): Boolean = isCurrentlyListening
 
     fun startListening() {
         if (!isAvailable()) {
@@ -36,14 +38,48 @@ class SpeechRecognitionManager(
         }
 
         isSessionActive = true
+        isPausedByUser = false
         mainHandler.post {
             initRecognizerIfNeeded()
             beginListeningInternal()
         }
     }
 
+    fun pauseListening() {
+        isPausedByUser = true
+        mainHandler.post {
+            try {
+                speechRecognizer?.stopListening()
+            } catch (e: Exception) {
+                Log.w(TAG, "Error pausing recognizer: ${e.message}")
+            }
+            isCurrentlyListening = false
+            onStatusChanged(false)
+            onRmsChanged(0f)
+        }
+    }
+
+    fun resumeListening() {
+        if (!isAvailable()) return
+        isSessionActive = true
+        isPausedByUser = false
+        mainHandler.post {
+            initRecognizerIfNeeded()
+            beginListeningInternal()
+        }
+    }
+
+    fun toggleListening() {
+        if (isCurrentlyListening) {
+            pauseListening()
+        } else {
+            resumeListening()
+        }
+    }
+
     fun stopListening() {
         isSessionActive = false
+        isPausedByUser = false
         mainHandler.post {
             try {
                 speechRecognizer?.stopListening()
@@ -58,6 +94,7 @@ class SpeechRecognitionManager(
 
     fun destroy() {
         isSessionActive = false
+        isPausedByUser = false
         mainHandler.removeCallbacksAndMessages(null)
         mainHandler.post {
             try {
@@ -80,7 +117,7 @@ class SpeechRecognitionManager(
     }
 
     private fun beginListeningInternal() {
-        if (!isSessionActive) return
+        if (!isSessionActive || isPausedByUser) return
 
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
@@ -103,9 +140,9 @@ class SpeechRecognitionManager(
     }
 
     private fun scheduleRestart(delayMillis: Long) {
-        if (!isSessionActive) return
+        if (!isSessionActive || isPausedByUser) return
         mainHandler.postDelayed({
-            if (isSessionActive) {
+            if (isSessionActive && !isPausedByUser) {
                 initRecognizerIfNeeded()
                 beginListeningInternal()
             }
@@ -114,17 +151,21 @@ class SpeechRecognitionManager(
 
     // RecognitionListener Callbacks
     override fun onReadyForSpeech(params: Bundle?) {
-        isCurrentlyListening = true
-        onStatusChanged(true)
+        if (!isPausedByUser) {
+            isCurrentlyListening = true
+            onStatusChanged(true)
+        }
     }
 
     override fun onBeginningOfSpeech() {
-        isCurrentlyListening = true
-        onStatusChanged(true)
+        if (!isPausedByUser) {
+            isCurrentlyListening = true
+            onStatusChanged(true)
+        }
     }
 
     override fun onRmsChanged(rmsdB: Float) {
-        if (!isSessionActive) {
+        if (!isSessionActive || isPausedByUser) {
             onRmsChanged(0f)
             return
         }
@@ -136,8 +177,7 @@ class SpeechRecognitionManager(
     override fun onBufferReceived(buffer: ByteArray?) {}
 
     override fun onEndOfSpeech() {
-        // Microphone paused speaking, but if user is still in voice session, we restart listening seamlessly
-        if (isSessionActive) {
+        if (isSessionActive && !isPausedByUser) {
             scheduleRestart(250)
         } else {
             isCurrentlyListening = false
@@ -150,9 +190,7 @@ class SpeechRecognitionManager(
         Log.d(TAG, "SpeechRecognizer error: $error")
         onRmsChanged(0f)
 
-        // Errors like ERROR_NO_MATCH, ERROR_SPEECH_TIMEOUT occur naturally on silent pauses.
-        // If the session is active, silently restart to keep listening.
-        if (isSessionActive) {
+        if (isSessionActive && !isPausedByUser) {
             when (error) {
                 SpeechRecognizer.ERROR_NO_MATCH,
                 SpeechRecognizer.ERROR_SPEECH_TIMEOUT,
@@ -187,7 +225,7 @@ class SpeechRecognitionManager(
         if (text.isNotBlank()) {
             onFinalText(text)
         }
-        if (isSessionActive) {
+        if (isSessionActive && !isPausedByUser) {
             scheduleRestart(200)
         }
     }

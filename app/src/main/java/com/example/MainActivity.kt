@@ -215,7 +215,8 @@ fun FinanceApp(
                     onAskDavid = {
                         viewModel.selectTab(NavigationTab.AI_ASSISTANT)
                         viewModel.sendChatMessage(it)
-                    }
+                    },
+                    onStartVoiceInput = { viewModel.startVoiceSession() }
                 )
                 NavigationTab.TRANSACTIONS -> TransactionsScreen(
                     state = state,

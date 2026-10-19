@@ -4,6 +4,7 @@ import com.example.domain.model.Budget
 import com.example.domain.model.Category
 import com.example.domain.model.Transaction
 import com.example.domain.model.TransactionType
+import com.example.voice.VoiceParserHelper
 import com.example.voice.VoiceTransactionParser
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -44,6 +45,75 @@ class FinanceLogicTest {
         assertEquals(50000.0, salary.amount, 0.01)
         assertEquals(TransactionType.INCOME, salary.type)
         assertEquals("Зарплата", salary.categoryName)
+    }
+
+    @Test
+    fun testVoiceParserSpaceSeparatedThousands() {
+        val utterance = "зарплата 65 000"
+        val parsed = VoiceParserHelper.parseUtterance(utterance, sampleCategories)
+
+        assertEquals(1, parsed.size)
+        val item = parsed.first()
+        assertEquals(65000.0, item.amount, 0.01)
+        assertEquals(TransactionType.INCOME, item.type)
+        assertEquals("Зарплата", item.title)
+    }
+
+    @Test
+    fun testVoiceParserWordNumeralsAndSlang() {
+        // Slang 1500
+        val taxiUtterance = "такси полторы тысячи"
+        val taxiParsed = VoiceParserHelper.parseUtterance(taxiUtterance, sampleCategories)
+        assertEquals(1, taxiParsed.size)
+        assertEquals(1500.0, taxiParsed.first().amount, 0.01)
+
+        // Compound numeral 55000
+        val salaryUtterance = "зарплата пятьдесят пять тысяч"
+        val salaryParsed = VoiceParserHelper.parseUtterance(salaryUtterance, sampleCategories)
+        assertEquals(1, salaryParsed.size)
+        assertEquals(55000.0, salaryParsed.first().amount, 0.01)
+        assertEquals(TransactionType.INCOME, salaryParsed.first().type)
+
+        // Slang 500
+        val coffeeUtterance = "кофе полтысячи"
+        val coffeeParsed = VoiceParserHelper.parseUtterance(coffeeUtterance, sampleCategories)
+        assertEquals(1, coffeeParsed.size)
+        assertEquals(500.0, coffeeParsed.first().amount, 0.01)
+    }
+
+    @Test
+    fun testVoiceParserMultipliers() {
+        val utterance = "аванс 45к и премия 65 тысяч"
+        val parsed = VoiceParserHelper.parseUtterance(utterance, sampleCategories)
+
+        assertEquals(2, parsed.size)
+        assertEquals(45000.0, parsed[0].amount, 0.01)
+        assertEquals(TransactionType.INCOME, parsed[0].type)
+        assertEquals(65000.0, parsed[1].amount, 0.01)
+        assertEquals(TransactionType.INCOME, parsed[1].type)
+    }
+
+    @Test
+    fun testVoiceParserTitleCleaning() {
+        val utterance = "купил кофе за 250 рублей"
+        val parsed = VoiceParserHelper.parseUtterance(utterance, sampleCategories)
+
+        assertEquals(1, parsed.size)
+        val item = parsed.first()
+        assertEquals(250.0, item.amount, 0.01)
+        assertEquals("Кофе", item.title)
+        assertEquals("Кафе и рестораны", item.categoryName)
+        assertEquals(TransactionType.EXPENSE, item.type)
+    }
+
+    @Test
+    fun testVoiceParserWithoutCommas() {
+        val utterance = "такси 500 кофе 200"
+        val parsed = VoiceParserHelper.parseUtterance(utterance, sampleCategories)
+
+        assertEquals(2, parsed.size)
+        assertEquals(500.0, parsed[0].amount, 0.01)
+        assertEquals(200.0, parsed[1].amount, 0.01)
     }
 
     @Test
