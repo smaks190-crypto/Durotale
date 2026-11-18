@@ -1,0 +1,21 @@
+config_version=5
+
+[application]
+config/name="ПАЛАТА №9 — Пролог"
+run/main_scene="res://scenes/main.tscn"
+config/description="Палата №9: самостоятельная пиксельная RPG о выборе и побеге."
+
+[display]
+window/size/viewport_width=640
+window/size/viewport_height=480
+window/stretch/mode="canvas_items"
+window/handheld/orientation=1
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/vram_compression/import_etc2_astc=true
+textures/canvas_textures/default_texture_filter=0
+
+[physics]
+2d/default_gravity=0.0
