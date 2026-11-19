@@ -87,7 +87,12 @@ jobs:
           set -euo pipefail
           echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-${ANDROID_HOME:-$HOME/Android/Sdk}}" >> "$GITHUB_ENV"
           mkdir -p "$HOME/.local/share/godot/keystores"
-          keytool -genkeypair -keystore "$HOME/.local/share/godot/keystores/debug.keystore"             -storepass android -alias androiddebugkey -keypass android             -keyalg RSA -keysize 2048 -validity 10000             -dname 'CN=Android Debug, OU=Android, O=Android, L=Mountain View, ST=California, C=US'
+          if [ ! -f "$HOME/.local/share/godot/keystores/debug.keystore" ]; then
+            keytool -genkeypair -keystore "$HOME/.local/share/godot/keystores/debug.keystore" \
+              -storepass android -alias androiddebugkey -keypass android \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname 'CN=Android Debug, OU=Android, O=Android, L=Mountain View, ST=California, C=US'
+          fi
           python3 - <<'PY'
           import os,pathlib,re,json
           p=pathlib.Path.home()/'.config/godot/editor_settings-4.7.tres'
