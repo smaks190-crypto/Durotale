@@ -14,6 +14,8 @@ var far_leaf: MeshInstance3D
 var neighbor_leaf: MeshInstance3D
 var neighbor_barrier: StaticBody3D
 var room_leaf: MeshInstance3D
+var frosted_glass: ShaderMaterial
+var outside_light: OmniLight3D
 var window_leaf: MeshInstance3D
 var shadow: MeshInstance3D
 var hall_light: OmniLight3D
@@ -85,6 +87,20 @@ func prism(label: String, center: Vector3, size: Vector3, material: Material, co
         body.add_child(shape)
         holder.add_child(body)
     return visual
+
+func tapered_piece(label: String, pos: Vector3, top_radius: float, bottom_radius: float, height: float, surface: Material, parent: Node3D) -> MeshInstance3D:
+    var m := CylinderMesh.new()
+    m.top_radius = top_radius
+    m.bottom_radius = bottom_radius
+    m.height = height
+    m.radial_segments = 9
+    var piece := MeshInstance3D.new()
+    piece.name = label
+    piece.mesh = m
+    piece.material_override = surface
+    piece.position = pos
+    parent.add_child(piece)
+    return piece
 
 func anchor(key: String, pos: Vector3, label: String) -> void:
     markers[key] = {"position":pos, "label":label}
@@ -212,7 +228,9 @@ func build_room() -> void:
         prism("BrokenRadiator",Vector3(-5.45,0.73,-1.9 + float(i)*0.8),Vector3(0.3,0.66,0.11),rust,false,rusty_tubes)
     ruined_props.append(rusty_tubes)
     # Window + bars, kept dark enough to make it an orientation anchor.
-    prism("WindowBlackGlass",Vector3(0,1.95,-5.78),Vector3(2.72,1.53,0.08),dark)
+    frosted_glass = ShaderMaterial.new()
+    frosted_glass.shader = load("res://shaders/frosted_window.gdshader") as Shader
+    prism("FrostedWardGlass",Vector3(0,1.95,-5.78),Vector3(2.72,1.53,0.08),frosted_glass)
     for i in 5:
         prism("WindowBarsV",Vector3(-1.2+float(i)*0.6,1.95,-5.67),Vector3(0.055,1.55,0.11),iron)
     for i in 3:
@@ -229,10 +247,30 @@ func build_room() -> void:
     nurse.name = "Nurse"
     nurse.position = Vector3(0.6,0,4.5)
     add_child(nurse)
-    prism("Coat",Vector3(0,1.08,0),Vector3(0.6,1.2,0.35),cloth,false,nurse)
-    prism("Head",Vector3(0,1.88,0),Vector3(0.38,0.4,0.35),mat(Color(0.44,0.42,0.40)),false,nurse)
-    prism("Cap",Vector3(0,2.13,0),Vector3(0.42,0.13,0.4),cloth,false,nurse)
-    prism("FoldedLinen",Vector3(0,1.18,-0.35),Vector3(0.67,0.14,0.4),cloth,false,nurse)
+    # Silhouette of a nurse, not a stack of rectangular boxes.
+    tapered_piece("NurseGown",Vector3(0,0.89,0),0.25,0.42,1.22,cloth,nurse)
+    tapered_piece("NurseJacket",Vector3(0,1.42,0),0.29,0.23,0.67,cloth,nurse)
+    var nurse_skin := mat(Color(0.37,0.345,0.323))
+    tapered_piece("Neck",Vector3(0,1.81,-0.01),0.09,0.10,0.21,nurse_skin,nurse)
+    var face := SphereMesh.new()
+    face.radius = 0.205
+    face.height = 0.39
+    face.radial_segments = 9
+    face.rings = 5
+    var nurse_head := MeshInstance3D.new()
+    nurse_head.name = "NurseHead"
+    nurse_head.mesh = face
+    nurse_head.material_override = nurse_skin
+    nurse_head.position = Vector3(0,2.00,-0.01)
+    nurse.add_child(nurse_head)
+    tapered_piece("NurseCap",Vector3(0,2.20,0.02),0.19,0.21,0.16,cloth,nurse)
+    for side in [-1.0,1.0]:
+        var sleeve := tapered_piece("NurseSleeve",Vector3(side*0.33,1.40,-0.025),0.13,0.105,0.73,cloth,nurse)
+        sleeve.rotation.z = side * -0.17
+        tapered_piece("NurseLeg",Vector3(side*0.15,0.2,0),0.095,0.075,0.39,dark,nurse)
+        prism("NurseShoe",Vector3(side*0.15,0.065,-0.06),Vector3(0.19,0.12,0.34),dark,false,nurse)
+    prism("FoldedLinen",Vector3(0,1.18,-0.36),Vector3(0.67,0.12,0.34),cloth,false,nurse)
+    prism("FoldedLinenEdge",Vector3(0,1.25,-0.37),Vector3(0.66,0.024,0.33),mat(Color(0.62,0.62,0.59)),false,nurse)
     room_leaf = prism("WardDoor",Vector3(1.15,1.22,5.8),Vector3(0.18,2.44,2.65),dark)
     room_leaf.visible = false
     anchor("radiator",Vector3(-5.10,0.5,-1.0),"Прислушаться / постучать")
@@ -374,6 +412,14 @@ func build_lighting() -> void:
     room_light.light_color = Color(0.83,0.85,0.9)
     room_light.shadow_enabled = true
     add_child(room_light)
+    outside_light = OmniLight3D.new()
+    outside_light.name = "DiffuseWindowGlow"
+    outside_light.position = Vector3(0,2.0,-4.95)
+    outside_light.omni_range = 5.5
+    outside_light.light_energy = 0.43
+    outside_light.light_color = Color(0.62,0.68,0.70)
+    outside_light.shadow_enabled = false
+    add_child(outside_light)
     hall_light = OmniLight3D.new()
     hall_light.position = Vector3(0,2.7,19.0)
     hall_light.omni_range = 9.5
@@ -430,6 +476,8 @@ func set_reality(new_reality: int, mixing: bool = false) -> void:
     hall_light.light_color = Color(0.85,0.86,0.88) if reality == 0 else (Color(0.48,0.49,0.50) if reality == 1 else Color(0.78,0.13,0.15))
     hall_light.light_energy = 0.75 if reality == 1 else 1.35
     room_light.light_energy = 1.65 if reality == 0 else 0.85
+    outside_light.light_energy = 0.43 if reality == 0 else (0.24 if reality == 1 else 0.11)
+    frosted_glass.set_shader_parameter("light_strength", 0.83 if reality == 0 else (0.42 if reality == 1 else 0.27))
     shadow.visible = mixing
     if is_instance_valid(ambience):
         ambience.call("set_reality", new_reality, mixing)
