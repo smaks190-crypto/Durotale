@@ -207,7 +207,7 @@ func build_room() -> void:
     clean_props.append(pillow)
     var bedside := prism("BedsideCabinet",Vector3(3.85,0.47,-2.2),Vector3(0.83,0.9,0.77),dark,true)
     var cup := prism("Mug",Vector3(3.8,0.98,-2.2),Vector3(0.18,0.16,0.18),cloth)
-    clean_props.append(cup)
+    cup.rotation.y = 0.2
     var chair := prism("OldChairSeat",Vector3(-0.6,0.46,-2.1),Vector3(0.66,0.12,0.64),iron,true)
     prism("OldChairBack",Vector3(-0.6,0.86,-2.41),Vector3(0.66,0.77,0.12),iron)
     for xx in [-0.83,-0.37]:
@@ -285,11 +285,11 @@ func build_corridor() -> void:
     neighbor_leaf = prism("NeighborDoor",Vector3(1.91,1.23,20.0),Vector3(0.13,2.44,2.7),dark)
     neighbor_barrier = StaticBody3D.new()
     neighbor_barrier.name = "NeighborLockCollision"
-    neighbor_barrier.position = Vector3(1.9,1.23,20)
+    neighbor_barrier.position = Vector3(1.9,1.5,19)
     neighbor_barrier.collision_layer = 1
     var cs := CollisionShape3D.new()
     var box := BoxShape3D.new()
-    box.size = Vector3(0.18,2.44,2.7)
+    box.size = Vector3(0.2,3.2,4.1)
     cs.shape = box
     neighbor_barrier.add_child(cs)
     add_child(neighbor_barrier)
@@ -478,11 +478,12 @@ func set_reality(new_reality: int, mixing: bool = false) -> void:
     room_light.light_energy = 1.65 if reality == 0 else 0.85
     outside_light.light_energy = 0.43 if reality == 0 else (0.24 if reality == 1 else 0.11)
     frosted_glass.set_shader_parameter("light_strength", 0.83 if reality == 0 else (0.42 if reality == 1 else 0.27))
-    shadow.visible = mixing
+    shadow.visible = false
     if is_instance_valid(ambience):
         ambience.call("set_reality", new_reality, mixing)
 
 func open_neighbor_door() -> void:
+    prism("InstalledLever",Vector3(2.16,1.1,21.1),Vector3(0.33,0.08,0.09),iron)
     neighbor_leaf.position = Vector3(2.08,1.23,21.28)
     neighbor_leaf.rotation.y = PI / 2.4
     if is_instance_valid(neighbor_barrier):

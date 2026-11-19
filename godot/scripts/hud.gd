@@ -128,9 +128,16 @@ func make_button(txt: String, bounds: Rect2, action: String) -> Button:
     b.size = bounds.size
     b.modulate = Color(1,1,1,0.73)
     b.focus_mode = Control.FOCUS_NONE
-    b.button_down.connect(func() -> void: Input.action_press(action))
-    b.button_up.connect(func() -> void: Input.action_release(action))
+    b.mouse_filter = Control.MOUSE_FILTER_IGNORE
     touch_controls.add_child(b)
+    var key := TouchScreenButton.new()
+    var shape := RectangleShape2D.new()
+    shape.size = bounds.size
+    key.shape = shape
+    key.position = bounds.get_center()
+    key.action = action
+    key.passby_press = action != "interact"
+    touch_controls.add_child(key)
     return b
 
 func make_touch_controls() -> void:
@@ -204,6 +211,7 @@ func make_ending() -> void:
     ending_panel.anchor_bottom = 0.73
     root.add_child(ending_panel)
     var content := VBoxContainer.new()
+    content.name = "VBoxContainer"
     content.add_theme_constant_override("separation",18)
     ending_panel.add_child(content)
     var end_title := text_label("ПАЛАТА №0",38,Color(0.93,0.92,0.91))

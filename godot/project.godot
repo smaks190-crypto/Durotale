@@ -5,7 +5,7 @@ config_version=5
 [application]
 config/name="Палата №0 — Дурка (демо)"
 run/main_scene="res://scenes/main.tscn"
-config/features=PackedStringArray("4.7", "GL Compatibility")
+config/features=PackedStringArray("4.6", "GL Compatibility")
 
 [rendering]
 textures/vram_compression/import_etc2_astc=true
@@ -19,7 +19,7 @@ environment/defaults/default_clear_color=Color(0.025, 0.025, 0.03, 1)
 window/size/viewport_width=1280
 window/size/viewport_height=720
 window/stretch/mode="canvas_items"
-window/handheld/orientation=1
+window/handheld/orientation=0
 
 [physics]
 3d/default_gravity=16.0
@@ -29,5 +29,5 @@ move_forward={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":8
 move_back={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":83)]}
 move_left={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":65)]}
 move_right={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":68)]}
-interact={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":69),Object(InputEventMouseButton,"button_index":1)]}
+interact={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":69)]}
 pause_game={"deadzone":0.2,"events":[Object(InputEventKey,"physical_keycode":4194305)]}

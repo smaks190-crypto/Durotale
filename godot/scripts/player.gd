@@ -130,14 +130,14 @@ func _ready() -> void:
     make_part(body_mesh,box_mesh(Vector3(0.16,0.055,0.075)),Vector3(0,1.95,0.20),Color(0.055,0.05,0.048))
 
     pivot = Node3D.new()
-    pivot.position = Vector3(0, 1.62, 0)
+    pivot.position = Vector3(0.36, 1.62, 0)
     pivot.name = "ViewPivot"
     add_child(pivot)
     var spring := SpringArm3D.new()
     spring.spring_length = 1.95
     spring.margin = 0.10
     var probe := SphereShape3D.new()
-    probe.radius = 0.20
+    probe.radius = 0.32
     spring.shape = probe
     spring.collision_mask = 1
     spring.add_excluded_object(get_rid())
@@ -149,7 +149,7 @@ func _ready() -> void:
     shoulder.name = "ShoulderCameraOffset"
     spring.add_child(shoulder)
     camera = Camera3D.new()
-    camera.position = Vector3(0.83, 0.14, 0)
+    camera.position = Vector3(0.08, 0.04, 0)
     camera.fov = 64
     camera.near = 0.08
     camera.current = true
