@@ -52,7 +52,7 @@ void fragment() {
     effect_rect.material = mat
     root.add_child(effect_rect)
 
-    var header := text_label("ПАЛАТА №0", 21, Color(0.88,0.87,0.85))
+    var header := text_label("ПАЛАТА №0", 18, Color(0.77,0.77,0.73))
     header.set_anchors_preset(Control.PRESET_TOP_LEFT)
     header.position = Vector2(26,18)
     header.size = Vector2(280,34)
@@ -77,11 +77,11 @@ void fragment() {
     hint.anchor_bottom = 0.76
     root.add_child(hint)
 
-    subtitle = text_label("",23,Color(0.95,0.94,0.89))
-    subtitle.anchor_left = 0.12
-    subtitle.anchor_right = 0.88
-    subtitle.anchor_top = 0.79
-    subtitle.anchor_bottom = 0.94
+    subtitle = text_label("",17,Color(0.91,0.90,0.84))
+    subtitle.anchor_left = 0.14
+    subtitle.anchor_right = 0.86
+    subtitle.anchor_top = 0.84
+    subtitle.anchor_bottom = 0.965
     root.add_child(subtitle)
 
     make_touch_controls()

@@ -54,9 +54,9 @@ func _ready() -> void:
     body_mesh.name = "LowPolyPatient"
     add_child(body_mesh)
     # Low-poly, tapered human silhouette rather than Roblox boxes.
-    var coat := Color(0.105,0.108,0.116)
-    var wool := Color(0.18,0.185,0.193)
-    var skin := Color(0.34,0.326,0.307)
+    var coat := Color(0.34,0.34,0.33)
+    var wool := Color(0.42,0.41,0.39)
+    var skin := Color(0.44,0.398,0.355)
     var shoes := Color(0.073,0.075,0.079)
     make_part(body_mesh, faceted_cylinder(0.295,0.43,1.08,7),Vector3(0,1.04,0),coat)
     make_part(body_mesh, faceted_cylinder(0.32,0.37,0.22,7),Vector3(0,1.46,0),wool)
@@ -76,24 +76,50 @@ func _ready() -> void:
     var head := SphereMesh.new()
     head.radius = 0.27
     head.height = 0.52
-    head.radial_segments = 7
-    head.rings = 4
+    head.radial_segments = 11
+    head.rings = 7
     make_part(body_mesh,head,Vector3(0,1.74,0),skin)
     var hair := SphereMesh.new()
-    hair.radius = 0.275
-    hair.height = 0.29
-    hair.radial_segments = 7
-    hair.rings = 3
-    make_part(body_mesh,hair,Vector3(0,1.94,0.035),Color(0.052,0.05,0.052))
+    hair.radius = 0.254
+    hair.height = 0.22
+    hair.radial_segments = 10
+    hair.rings = 5
+    make_part(body_mesh,hair,Vector3(0,1.93,0.032),Color(0.105,0.10,0.10))
+    var back_hair := SphereMesh.new()
+    back_hair.radius = 0.255
+    back_hair.height = 0.32
+    back_hair.radial_segments = 10
+    back_hair.rings = 5
+    make_part(body_mesh,back_hair,Vector3(0,1.83,0.115),Color(0.097,0.092,0.088))
+    make_part(body_mesh,box_mesh(Vector3(0.19,0.085,0.12)),Vector3(0,1.89,0.235),Color(0.125,0.12,0.115))
     make_part(body_mesh,box_mesh(Vector3(0.13,0.12,0.12)),Vector3(0,1.72,-0.25),skin)
     make_part(body_mesh,box_mesh(Vector3(0.12,0.31,0.06)),Vector3(0,1.20,-0.34),Color(0.22,0.22,0.225))
+    # The rear of an old civilian jacket needs silhouette and fabric structure,
+    # not a single featureless cone. These patches have no collision.
+    var seam := Color(0.24,0.25,0.245)
+    make_part(body_mesh,box_mesh(Vector3(0.026,0.64,0.038)),Vector3(0,1.02,0.365),seam)
+    make_part(body_mesh,box_mesh(Vector3(0.54,0.055,0.11)),Vector3(0,1.38,0.285),wool)
+    for side in [-1.0,1.0]:
+        var shoulder := make_part(body_mesh,box_mesh(Vector3(0.19,0.055,0.26)),Vector3(side*0.32,1.49,0.055),coat)
+        shoulder.rotation.z = side * 0.14
+        var back_pleat := make_part(body_mesh,box_mesh(Vector3(0.035,0.61,0.028)),Vector3(side*0.23,1.03,0.323),seam)
+        back_pleat.rotation.z = side * 0.07
+        make_part(body_mesh,box_mesh(Vector3(0.15,0.11,0.046)),Vector3(side*0.29,0.86,0.31),wool)
+    var fill := OmniLight3D.new()
+    fill.name = "SubtleCharacterFill"
+    fill.position = Vector3(0.8,2.15,1.35)
+    fill.omni_range = 3.1
+    fill.light_energy = 0.65
+    fill.light_color = Color(0.77,0.78,0.80)
+    fill.shadow_enabled = false
+    add_child(fill)
 
     pivot = Node3D.new()
     pivot.position = Vector3(0, 1.64, 0)
     pivot.name = "ViewPivot"
     add_child(pivot)
     var spring := SpringArm3D.new()
-    spring.spring_length = 2.45
+    spring.spring_length = 2.38
     spring.margin = 0.12
     var probe := SphereShape3D.new()
     probe.radius = 0.25
@@ -101,11 +127,16 @@ func _ready() -> void:
     spring.collision_mask = 1
     spring.add_excluded_object(get_rid())
     pivot.add_child(spring)
+    # SpringArm3D rewrites direct children's position! A nested mount keeps
+    # the camera's lateral shoulder offset while the arm handles collisions.
+    var shoulder_mount := Node3D.new()
+    shoulder_mount.name = "OverShoulderMount"
+    spring.add_child(shoulder_mount)
     camera = Camera3D.new()
-    camera.position = Vector3(0.48, 0.11, 0)
+    camera.position = Vector3(1.24, 0.16, 0)
     camera.fov = 69
     camera.current = true
-    spring.add_child(camera)
+    shoulder_mount.add_child(camera)
     apply_orientation()
     if not OS.has_feature("mobile"):
         Input.mouse_mode = Input.MOUSE_MODE_CAPTURED

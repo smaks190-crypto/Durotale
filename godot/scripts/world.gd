@@ -21,6 +21,7 @@ var room_light: OmniLight3D
 var reality := 0
 var mixed := false
 var ambience: Node3D
+var visual_dressing: Node3D
 
 var paint_clean: ShaderMaterial
 var paint_ruined: ShaderMaterial
@@ -95,7 +96,7 @@ func _ready() -> void:
     var decay_shader := load("res://shaders/decay_wall.gdshader") as Shader
     paint_clean = ShaderMaterial.new()
     paint_clean.shader = decay_shader
-    paint_clean.set_shader_parameter("damage", 0.07)
+    paint_clean.set_shader_parameter("damage", 0.38)
     paint_clean.set_shader_parameter("plaster_color", Color(0.74, 0.76, 0.75, 1.0))
     paint_ruined = ShaderMaterial.new()
     paint_ruined.shader = decay_shader
@@ -108,10 +109,12 @@ func _ready() -> void:
     paint_warped.set_shader_parameter("stain_color", Color(0.6, 0.1, 0.1, 1.0))
     tiles_clean = mat(Color(0.82,0.83,0.84), chess)
     tiles_ruined = mat(Color(0.40,0.42,0.44), chess)
-    tiles_clean.roughness = 0.35
-    tiles_clean.metallic = 0.18
-    tiles_ruined.roughness = 0.48
-    tiles_ruined.metallic = 0.12
+    tiles_clean.roughness = 0.21
+    tiles_clean.metallic = 0.07
+    tiles_clean.uv1_scale = Vector3(3, 3, 3)
+    tiles_ruined.roughness = 0.29
+    tiles_ruined.metallic = 0.06
+    tiles_ruined.uv1_scale = Vector3(3, 3, 3)
     iron = mat(Color(0.31,0.32,0.34))
     rust = mat(Color(0.27,0.18,0.15))
     cloth = mat(Color(0.80,0.80,0.74))
@@ -127,6 +130,9 @@ func _ready() -> void:
     ambience = preload("res://scripts/atmosphere.gd").new()
     ambience.name = "HospitalSetDressing"
     add_child(ambience)
+    visual_dressing = preload("res://scripts/visual_dressing.gd").new()
+    visual_dressing.name = "CinematicSetDressing"
+    add_child(visual_dressing)
     set_reality(0)
 
 func shell_floor(center: Vector3, size: Vector3, label: String) -> void:
@@ -308,16 +314,18 @@ func build_lighting() -> void:
     env.background_color = Color(0.015,0.017,0.021)
     env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
     env.ambient_light_color = Color(0.22,0.23,0.25)
-    env.ambient_light_energy = 0.38
+    env.ambient_light_energy = 0.49
     env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
     env_world.environment = env
     add_child(env_world)
     room_light = OmniLight3D.new()
     room_light.position = Vector3(0,2.75,0)
     room_light.omni_range = 17.0
-    room_light.light_energy = 1.5
-    room_light.light_color = Color(0.83,0.85,0.9)
-    room_light.shadow_enabled = true
+    room_light.light_energy = 1.8
+    room_light.light_color = Color(0.90,0.90,0.86)
+    # The overhead fixture already blocks light; shadows here produced a huge
+    # polygonal black wedge on the ceiling with GL Compatibility.
+    room_light.shadow_enabled = false
     add_child(room_light)
     hall_light = OmniLight3D.new()
     hall_light.position = Vector3(0,2.7,19.0)
@@ -362,11 +370,13 @@ func set_reality(new_reality: int, mixing: bool = false) -> void:
             w.material_override = paint_ruined
     room_light.light_color = Color(0.75,0.83,0.90) if reality != 2 else Color(0.68,0.18,0.19)
     hall_light.light_color = Color(0.85,0.86,0.88) if reality == 0 else (Color(0.48,0.49,0.50) if reality == 1 else Color(0.78,0.13,0.15))
-    hall_light.light_energy = 0.75 if reality == 1 else 1.35
-    room_light.light_energy = 1.65 if reality == 0 else 0.85
+    hall_light.light_energy = 0.95 if reality == 1 else 1.55
+    room_light.light_energy = 1.90 if reality == 0 else (1.15 if reality == 1 else 0.78)
     shadow.visible = mixing
     if is_instance_valid(ambience):
         ambience.call("set_reality", new_reality, mixing)
+    if is_instance_valid(visual_dressing):
+        visual_dressing.call("set_reality", new_reality, mixing)
 
 func open_neighbor_door() -> void:
     neighbor_leaf.position = Vector3(2.08,1.23,21.28)

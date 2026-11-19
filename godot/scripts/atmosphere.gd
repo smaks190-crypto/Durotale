@@ -183,7 +183,7 @@ func build_fluorescents() -> void:
     var lights := category("CeilingLightFixtures")
     for z in [0.0,10.8,15.5,22.0,25.5]:
         var x := 0.0
-        box("FluorescentHousing",Vector3(x,3.02,z),Vector3(0.83,0.11,0.34),charcoal,lights)
+        box("FluorescentHousing",Vector3(x,3.02,z),Vector3(0.68,0.065,0.27),iron,lights)
         for off in [-0.21,0.21]:
             box("FluorescentTube",Vector3(x+off,2.94,z),Vector3(0.07,0.055,0.30),enamel,lights)
 
