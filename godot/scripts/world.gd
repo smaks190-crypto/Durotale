@@ -21,9 +21,9 @@ var room_light: OmniLight3D
 var reality := 0
 var mixed := false
 
-var paint_clean: StandardMaterial3D
-var paint_ruined: StandardMaterial3D
-var paint_warped: StandardMaterial3D
+var paint_clean: ShaderMaterial
+var paint_ruined: ShaderMaterial
+var paint_warped: ShaderMaterial
 var tiles_clean: StandardMaterial3D
 var tiles_ruined: StandardMaterial3D
 var iron: StandardMaterial3D
@@ -91,9 +91,20 @@ func anchor(key: String, pos: Vector3, label: String) -> void:
 func _ready() -> void:
     var grunge := make_grime(false)
     var chess := make_grime(true)
-    paint_clean = mat(Color(0.74,0.76,0.75), grunge)
-    paint_ruined = mat(Color(0.39,0.41,0.42), grunge)
-    paint_warped = mat(Color(0.45,0.22,0.24), grunge)
+    var decay_shader := load("res://shaders/decay_wall.gdshader") as Shader
+    paint_clean = ShaderMaterial.new()
+    paint_clean.shader = decay_shader
+    paint_clean.set_shader_parameter("damage", 0.07)
+    paint_clean.set_shader_parameter("plaster_color", Color(0.74, 0.76, 0.75, 1.0))
+    paint_ruined = ShaderMaterial.new()
+    paint_ruined.shader = decay_shader
+    paint_ruined.set_shader_parameter("damage", 0.70)
+    paint_ruined.set_shader_parameter("plaster_color", Color(0.39, 0.41, 0.42, 1.0))
+    paint_warped = ShaderMaterial.new()
+    paint_warped.shader = decay_shader
+    paint_warped.set_shader_parameter("damage", 0.92)
+    paint_warped.set_shader_parameter("plaster_color", Color(0.12, 0.10, 0.12, 1.0))
+    paint_warped.set_shader_parameter("stain_color", Color(0.6, 0.1, 0.1, 1.0))
     tiles_clean = mat(Color(0.82,0.83,0.84), chess)
     tiles_ruined = mat(Color(0.40,0.42,0.44), chess)
     iron = mat(Color(0.31,0.32,0.34))
