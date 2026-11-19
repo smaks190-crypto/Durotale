@@ -25,8 +25,8 @@ var ambience: Node3D
 var paint_clean: ShaderMaterial
 var paint_ruined: ShaderMaterial
 var paint_warped: ShaderMaterial
-var tiles_clean: StandardMaterial3D
-var tiles_ruined: StandardMaterial3D
+var tiles_clean: ShaderMaterial
+var tiles_ruined: ShaderMaterial
 var iron: StandardMaterial3D
 var rust: StandardMaterial3D
 var cloth: StandardMaterial3D
@@ -90,8 +90,6 @@ func anchor(key: String, pos: Vector3, label: String) -> void:
     markers[key] = {"position":pos, "label":label}
 
 func _ready() -> void:
-    var grunge := make_grime(false)
-    var chess := make_grime(true)
     var decay_shader := load("res://shaders/decay_wall.gdshader") as Shader
     paint_clean = ShaderMaterial.new()
     paint_clean.shader = decay_shader
@@ -105,13 +103,21 @@ func _ready() -> void:
     paint_warped.shader = decay_shader
     paint_warped.set_shader_parameter("damage", 0.92)
     paint_warped.set_shader_parameter("plaster_color", Color(0.12, 0.10, 0.12, 1.0))
-    paint_warped.set_shader_parameter("stain_color", Color(0.6, 0.1, 0.1, 1.0))
-    tiles_clean = mat(Color(0.82,0.83,0.84), chess)
-    tiles_ruined = mat(Color(0.40,0.42,0.44), chess)
-    tiles_clean.roughness = 0.35
-    tiles_clean.metallic = 0.18
-    tiles_ruined.roughness = 0.48
-    tiles_ruined.metallic = 0.12
+    paint_warped.set_shader_parameter("stain_color", Color(0.35, 0.085, 0.08, 1.0))
+    paint_clean.set_shader_parameter("lower_color", Color(0.25, 0.29, 0.285))
+    paint_ruined.set_shader_parameter("lower_color", Color(0.13, 0.15, 0.15))
+    paint_warped.set_shader_parameter("lower_color", Color(0.10, 0.065, 0.07))
+    # World-space, wet and aged checkerboard. Repeated at 58 cm instead of
+    # stretching 8 squares across an entire twelve-meter room.
+    var floor_shader := load("res://shaders/aged_tiles.gdshader") as Shader
+    tiles_clean = ShaderMaterial.new()
+    tiles_clean.shader = floor_shader
+    tiles_clean.set_shader_parameter("damage", 0.10)
+    tiles_clean.set_shader_parameter("wetness", 0.42)
+    tiles_ruined = ShaderMaterial.new()
+    tiles_ruined.shader = floor_shader
+    tiles_ruined.set_shader_parameter("damage", 0.84)
+    tiles_ruined.set_shader_parameter("wetness", 0.78)
     iron = mat(Color(0.31,0.32,0.34))
     rust = mat(Color(0.27,0.18,0.15))
     cloth = mat(Color(0.80,0.80,0.74))
@@ -123,6 +129,7 @@ func _ready() -> void:
     build_neighbor()
     build_archive()
     build_treatment()
+    build_architecture()
     build_lighting()
     ambience = preload("res://scripts/atmosphere.gd").new()
     ambience.name = "HospitalSetDressing"
@@ -301,6 +308,51 @@ func build_neighbor() -> void:
     shadow.visible = false
     anchor("neighbor_inside",Vector3(4,1,20),"За дверью")
 
+func build_architecture() -> void:
+    # Human-scale details. Keep these free of collision so they do not block
+    # the established puzzle route or the interaction anchor positions.
+    var tarnished := mat(Color(0.14, 0.155, 0.155))
+    var pale_iron := mat(Color(0.34, 0.345, 0.345))
+    var cracked := mat(Color(0.19, 0.18, 0.17))
+    var enamel_lamp := mat(Color(0.86, 0.87, 0.81))
+    enamel_lamp.emission_enabled = true
+    enamel_lamp.emission = Color(0.63, 0.67, 0.61)
+    enamel_lamp.emission_energy_multiplier = 1.6
+    # Perimeter molding and dark skirting produce legible room dimensions.
+    for z in [-5.82, 5.82]:
+        prism("WardSkirting",Vector3(0,0.12,z),Vector3(11.6,0.24,0.07),tarnished)
+        prism("WardCornice",Vector3(0,3.01,z),Vector3(11.6,0.055,0.065),pale_iron)
+    for x in [-5.82, 5.82]:
+        prism("WardSkirting",Vector3(x,0.12,0),Vector3(0.07,0.24,11.6),tarnished)
+        prism("WardCornice",Vector3(x,3.01,0),Vector3(0.07,0.055,11.6),pale_iron)
+    for x in [-1.85, 1.85]:
+        prism("HallSkirting",Vector3(x,0.12,17),Vector3(0.07,0.24,21.6),tarnished)
+        prism("HallMolding",Vector3(x,1.43,17),Vector3(0.06,0.045,21.6),pale_iron)
+        prism("HallCornice",Vector3(x,3.02,17),Vector3(0.06,0.06,21.6),tarnished)
+    # Doors and windows must have frames, thresholds and a sense of depth.
+    for x in [-1.55,1.55]:
+        prism("WardDoorJamb",Vector3(x,1.19,5.76),Vector3(0.17,2.38,0.27),pale_iron)
+    prism("WardDoorLintel",Vector3(0,2.41,5.76),Vector3(3.25,0.16,0.27),pale_iron)
+    prism("WardDoorThreshold",Vector3(0,0.023,5.77),Vector3(3.16,0.055,0.26),tarnished)
+    for x in [-1.48,1.48]:
+        prism("WindowJamb",Vector3(x,1.96,-5.65),Vector3(0.10,1.69,0.18),cracked)
+    for y in [1.12,2.77]:
+        prism("WindowLintel",Vector3(0,y,-5.65),Vector3(3.05,0.1,0.18),cracked)
+    prism("WindowSill",Vector3(0,1.08,-5.48),Vector3(3.1,0.09,0.38),pale_iron)
+    # Hanging light tubes have real emissive surfaces, not white non-emissive blocks.
+    for z in [0.0, 10.8, 15.5, 22.0, 25.5]:
+        for x in [-0.19, 0.19]:
+            prism("LitFluorescentTube",Vector3(x,2.895,z),Vector3(0.065,0.055,0.29),enamel_lamp)
+    # Exposed electrical conduits and cracked tile edging break up the box look.
+    for side in [-1.0,1.0]:
+        prism("WardElectricalConduit",Vector3(side*5.83,2.78,-1.3),Vector3(0.065,0.05,6.6),pale_iron)
+        for z in [-4.5,-2.1,0.4]:
+            prism("PipeClamp",Vector3(side*5.81,2.79,z),Vector3(0.10,0.10,0.08),tarnished)
+    for i in 8:
+        var z: float = 7.3 + float(i)*2.6
+        prism("HallCeilingSeam",Vector3(0,3.045,z),Vector3(3.65,0.018,0.02),tarnished)
+
+
 func build_lighting() -> void:
     var env_world := WorldEnvironment.new()
     var env := Environment.new()
@@ -308,23 +360,37 @@ func build_lighting() -> void:
     env.background_color = Color(0.015,0.017,0.021)
     env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
     env.ambient_light_color = Color(0.22,0.23,0.25)
-    env.ambient_light_energy = 0.38
+    env.ambient_light_energy = 0.52
     env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+    env.fog_enabled = true
+    env.fog_light_color = Color(0.105, 0.115, 0.12)
+    env.fog_density = 0.013
     env_world.environment = env
     add_child(env_world)
     room_light = OmniLight3D.new()
     room_light.position = Vector3(0,2.75,0)
-    room_light.omni_range = 17.0
-    room_light.light_energy = 1.5
+    room_light.omni_range = 9.5
+    room_light.light_energy = 1.65
     room_light.light_color = Color(0.83,0.85,0.9)
     room_light.shadow_enabled = true
     add_child(room_light)
     hall_light = OmniLight3D.new()
     hall_light.position = Vector3(0,2.7,19.0)
-    hall_light.omni_range = 16.0
-    hall_light.light_energy = 1.2
+    hall_light.omni_range = 9.5
+    hall_light.light_energy = 1.32
     hall_light.light_color = Color(0.82,0.84,0.91)
     add_child(hall_light)
+    # Distinct pools of cold light along the hall: avoid uniformly illuminating
+    # the entire corridor, while retaining readable navigation on mobile.
+    for z in [10.8, 15.5, 25.5]:
+        var fixture := OmniLight3D.new()
+        fixture.name = "HallPractical"
+        fixture.position = Vector3(0,2.84,z)
+        fixture.omni_range = 5.5
+        fixture.light_energy = 0.72
+        fixture.light_color = Color(0.69,0.77,0.78)
+        fixture.shadow_enabled = false
+        add_child(fixture)
     var treatment_light := OmniLight3D.new()
     treatment_light.position = Vector3(5.2,2.72,11.0)
     treatment_light.omni_range = 9.0
