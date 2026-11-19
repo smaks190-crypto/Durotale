@@ -65,8 +65,8 @@ func _ready() -> void:
     body_mesh.name = "LowPolyPatient"
     add_child(body_mesh)
     # Low-poly, tapered human silhouette rather than Roblox boxes.
-    var coat := Color(0.105,0.108,0.116)
-    var wool := Color(0.18,0.185,0.193)
+    var coat := Color(0.175,0.18,0.187)
+    var wool := Color(0.27,0.275,0.281)
     var skin := Color(0.34,0.326,0.307)
     var shoes := Color(0.073,0.075,0.079)
     # The body is tapered like an actual old coat, never a rectangular block.
@@ -126,7 +126,7 @@ func _ready() -> void:
     pivot.name = "ViewPivot"
     add_child(pivot)
     var spring := SpringArm3D.new()
-    spring.spring_length = 1.70
+    spring.spring_length = 1.95
     spring.margin = 0.10
     var probe := SphereShape3D.new()
     probe.radius = 0.20
@@ -134,12 +134,28 @@ func _ready() -> void:
     spring.collision_mask = 1
     spring.add_excluded_object(get_rid())
     pivot.add_child(spring)
+    # SpringArm3D changes the position of its direct child every physics frame.
+    # Offset the GRANDCHILD camera, not the spring's direct child, otherwise
+    # the intended over-the-shoulder composition is silently reset to center.
+    var shoulder := Node3D.new()
+    shoulder.name = "ShoulderCameraOffset"
+    spring.add_child(shoulder)
     camera = Camera3D.new()
-    camera.position = Vector3(0.60, 0.13, 0)
+    camera.position = Vector3(0.83, 0.14, 0)
     camera.fov = 64
     camera.near = 0.08
     camera.current = true
-    spring.add_child(camera)
+    shoulder.add_child(camera)
+    # Soft character bounce light: keep fabric legible without lighting the
+    # whole room like a gameplay flashlight.
+    var character_fill := OmniLight3D.new()
+    character_fill.name = "CharacterBounceFill"
+    character_fill.position = Vector3(0.1, 1.85, 0.87)
+    character_fill.omni_range = 2.25
+    character_fill.light_energy = 0.36
+    character_fill.light_color = Color(0.67, 0.72, 0.72)
+    character_fill.shadow_enabled = false
+    add_child(character_fill)
     apply_orientation()
     if not OS.has_feature("mobile"):
         Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
