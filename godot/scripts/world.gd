@@ -20,6 +20,7 @@ var hall_light: OmniLight3D
 var room_light: OmniLight3D
 var reality := 0
 var mixed := false
+var ambience: Node3D
 
 var paint_clean: ShaderMaterial
 var paint_ruined: ShaderMaterial
@@ -107,6 +108,10 @@ func _ready() -> void:
     paint_warped.set_shader_parameter("stain_color", Color(0.6, 0.1, 0.1, 1.0))
     tiles_clean = mat(Color(0.82,0.83,0.84), chess)
     tiles_ruined = mat(Color(0.40,0.42,0.44), chess)
+    tiles_clean.roughness = 0.35
+    tiles_clean.metallic = 0.18
+    tiles_ruined.roughness = 0.48
+    tiles_ruined.metallic = 0.12
     iron = mat(Color(0.31,0.32,0.34))
     rust = mat(Color(0.27,0.18,0.15))
     cloth = mat(Color(0.80,0.80,0.74))
@@ -116,7 +121,12 @@ func _ready() -> void:
     build_room()
     build_corridor()
     build_neighbor()
+    build_archive()
+    build_treatment()
     build_lighting()
+    ambience = preload("res://scripts/atmosphere.gd").new()
+    ambience.name = "HospitalSetDressing"
+    add_child(ambience)
     set_reality(0)
 
 func shell_floor(center: Vector3, size: Vector3, label: String) -> void:
@@ -129,13 +139,25 @@ func build_shell() -> void:
     shell_floor(Vector3(0, -0.18, 0), Vector3(12,0.35,12), "WardFloor")
     shell_floor(Vector3(0, -0.18, 17), Vector3(4,0.35,22), "CorridorFloor")
     shell_floor(Vector3(6.4, -0.18, 20), Vector3(8.8,0.35,10), "NeighborFloor")
+    shell_floor(Vector3(-4.5,-0.18,14),Vector3(5.0,0.35,6.0),"ArchiveFloor")
+    shell_floor(Vector3(5.0,-0.18,11.0),Vector3(6.0,0.35,6.0),"TreatmentFloor")
     shell_wall(Vector3(-6,1.6,0), Vector3(0.3,3.2,12), "WardWest")
     shell_wall(Vector3(6,1.6,0), Vector3(0.3,3.2,12), "WardEast")
     shell_wall(Vector3(0,1.6,-6), Vector3(12,3.2,0.3), "WardSouth")
     shell_wall(Vector3(-3.9,1.6,6), Vector3(4.2,3.2,0.3), "WardNorthLeft")
     shell_wall(Vector3(3.9,1.6,6), Vector3(4.2,3.2,0.3), "WardNorthRight")
-    shell_wall(Vector3(-2,1.6,17), Vector3(0.26,3.2,22), "CorridorWest")
-    shell_wall(Vector3(2,1.6,11.5), Vector3(0.26,3.2,11), "CorridorEastNear")
+    # A readable side room reached without changing the known corridor route.
+    shell_wall(Vector3(-2,1.6,8.5), Vector3(0.26,3.2,5.0), "CorridorWestNear")
+    shell_wall(Vector3(-2,1.6,22.5), Vector3(0.26,3.2,11.0), "CorridorWestFar")
+    shell_wall(Vector3(-7.0,1.6,14), Vector3(0.28,3.2,6.0), "ArchiveWest")
+    shell_wall(Vector3(-4.5,1.6,11.0), Vector3(5.0,3.2,0.28), "ArchiveSouth")
+    shell_wall(Vector3(-4.5,1.6,17.0), Vector3(5.0,3.2,0.28), "ArchiveNorth")
+    # An eastern treatment room opens directly from the station.
+    shell_wall(Vector3(2,1.6,7.5), Vector3(0.26,3.2,3), "CorridorEastEntry")
+    shell_wall(Vector3(2,1.6,14.5), Vector3(0.26,3.2,5), "CorridorEastMid")
+    shell_wall(Vector3(8.0,1.6,11.0),Vector3(0.3,3.2,6.0),"TreatmentEast")
+    shell_wall(Vector3(5.0,1.6,8.0),Vector3(6.0,3.2,0.3),"TreatmentSouth")
+    shell_wall(Vector3(5.0,1.6,14.0),Vector3(6.0,3.2,0.3),"TreatmentNorth")
     shell_wall(Vector3(2,1.6,24.5), Vector3(0.26,3.2,7), "CorridorEastFar")
     shell_wall(Vector3(0,1.6,28), Vector3(4,3.2,0.28), "FarBoundary")
     shell_wall(Vector3(11,1.6,20), Vector3(0.3,3.2,10), "NeighborEast")
@@ -144,6 +166,8 @@ func build_shell() -> void:
     prism("WardCeiling",Vector3(0,3.2,0),Vector3(12,0.25,12),dark,true)
     prism("CorridorCeiling",Vector3(0,3.2,17),Vector3(4,0.25,22),dark,true)
     prism("NeighborCeiling",Vector3(6.5,3.2,20),Vector3(9,0.25,10),dark,true)
+    prism("ArchiveCeiling",Vector3(-4.5,3.2,14),Vector3(5,0.25,6),dark,true)
+    prism("TreatmentCeiling",Vector3(5,3.2,11),Vector3(6,0.25,6),dark,true)
 
 func build_room() -> void:
     # Recognizable furnishings occupy identical physical coordinates in each reality.
@@ -206,6 +230,8 @@ func build_room() -> void:
     room_leaf.visible = false
     anchor("radiator",Vector3(-5.10,0.5,-1.0),"Прислушаться / постучать")
     anchor("window",Vector3(0,1.3,-5.0),"Закрыть форточку")
+    anchor("bed",Vector3(2.05,0.8,-1.6),"Кровать")
+    anchor("cup",Vector3(3.80,0.9,-2.2),"Кружка")
     anchor("ward_door",Vector3(0,1.0,5.5),"Палата")
 
 func build_corridor() -> void:
@@ -236,11 +262,36 @@ func build_corridor() -> void:
     anchor("far_door",Vector3(0,1,27.0),"Открыть дверь")
     anchor("neighbor_door",Vector3(1.5,1,20),"Дверь соседней палаты")
     anchor("station_exit",Vector3(-0.8,1,10.0),"Уйти через пост")
+    anchor("medical_record",Vector3(-1.8,1,10.5),"Карточка пациента")
+    anchor("trolley",Vector3(1,0.9,17.6),"Каталка")
     var impossible := prism("ImpossiblePassage",Vector3(0,2.62,22.4),Vector3(3.6,0.15,0.23),blood)
     impossible.rotation.z = 0.39
     warped_props.append(impossible)
     var shadow_leak := prism("LivingHospitalShadow",Vector3(1.7,0.03,20.0),Vector3(0.18,0.02,2.5),blood)
     warped_props.append(shadow_leak)
+
+func build_archive() -> void:
+    prism("ArchiveDesk",Vector3(-5.4,0.67,15),Vector3(1.7,1.05,0.68),iron,true)
+    for i in 4:
+        prism("ArchiveLedger",Vector3(-5.9+float(i)*0.23,1.21,15),Vector3(0.16,0.06,0.42),cloth)
+    prism("ArchiveShelf",Vector3(-6.64,1.45,13.0),Vector3(0.32,2.5,2.15),dark,true)
+    for y in [0.5,1.2,1.9]:
+        prism("ArchiveRack",Vector3(-6.35,y,13.0),Vector3(0.6,0.08,2.18),iron)
+    anchor("archive_record",Vector3(-5.2,1.0,15.0),"История болезни")
+
+func build_treatment() -> void:
+    prism("TreatmentBed",Vector3(6.3,0.55,11.6),Vector3(1.65,0.18,2.95),iron,true)
+    var sheet := prism("TreatmentSheet",Vector3(6.3,0.70,11.6),Vector3(1.49,0.16,2.78),cloth)
+    clean_props.append(sheet)
+    var rotten := prism("TreatmentRot",Vector3(6.3,0.70,11.6),Vector3(1.52,0.16,2.78),rust)
+    ruined_props.append(rotten)
+    prism("TreatmentWardrobe",Vector3(7.38,1.08,9.15),Vector3(0.82,2.12,0.8),dark,true)
+    prism("TreatmentTray",Vector3(3.75,0.72,12.65),Vector3(0.8,0.09,0.52),iron)
+    for i in 3:
+        prism("TreatmentGlassBottle",Vector3(3.55+float(i)*0.2,0.88,12.6),Vector3(0.13,0.28+float(i%2)*0.16,0.13),cloth)
+    prism("TreatmentRail",Vector3(6.3,1.35,10.13),Vector3(1.5,0.08,0.09),iron)
+    prism("OperatingLight",Vector3(5.0,2.92,11.0),Vector3(1.0,0.12,0.51),cloth)
+    anchor("treatment_notes",Vector3(3.65,0.95,12.6),"Медицинский поднос")
 
 func build_neighbor() -> void:
     prism("NeighborBed",Vector3(7.1,0.57,19.7),Vector3(2.3,0.2,3),iron,true)
@@ -274,6 +325,18 @@ func build_lighting() -> void:
     hall_light.light_energy = 1.2
     hall_light.light_color = Color(0.82,0.84,0.91)
     add_child(hall_light)
+    var treatment_light := OmniLight3D.new()
+    treatment_light.position = Vector3(5.2,2.72,11.0)
+    treatment_light.omni_range = 9.0
+    treatment_light.light_energy = 0.79
+    treatment_light.light_color = Color(0.82,0.85,0.84)
+    add_child(treatment_light)
+    var archive_light := OmniLight3D.new()
+    archive_light.position = Vector3(-4.5,2.75,14)
+    archive_light.omni_range = 9.5
+    archive_light.light_energy = 0.64
+    archive_light.light_color = Color(0.78,0.77,0.74)
+    add_child(archive_light)
     var neighbor_light := OmniLight3D.new()
     neighbor_light.position = Vector3(6,2.7,20)
     neighbor_light.omni_range = 9
@@ -302,6 +365,8 @@ func set_reality(new_reality: int, mixing: bool = false) -> void:
     hall_light.light_energy = 0.75 if reality == 1 else 1.35
     room_light.light_energy = 1.65 if reality == 0 else 0.85
     shadow.visible = mixing
+    if is_instance_valid(ambience):
+        ambience.call("set_reality", new_reality, mixing)
 
 func open_neighbor_door() -> void:
     neighbor_leaf.position = Vector3(2.08,1.23,21.28)

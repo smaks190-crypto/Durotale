@@ -29,6 +29,10 @@ var current_target := ""
 var last_footstep := 0.0
 var intro_nurse_gone := false
 var end_started := false
+var returned_to_ward_at := -1.0
+var yaw_when_returned := 0.0
+var knock_serial := 0
+var breathed_once := false
 
 func _ready() -> void:
     run = StateScript.new()
@@ -54,7 +58,7 @@ func _ready() -> void:
     title_text("Утро. Больничная палата.\nWASD — ходить, мышь — осмотреться, E — взаимодействовать, Esc — пауза.", 7.0)
     # The nurse does not wait for a quest trigger; the room remains safe and calm.
     get_tree().create_timer(3.2).timeout.connect(_nurse_hello)
-    get_tree().create_timer(10.0).timeout.connect(_nurse_leaves)
+    get_tree().create_timer(19.0).timeout.connect(_nurse_leaves)
 
 func _nurse_hello() -> void:
     if run.chapter == DurkaRunState.Chapter.FINISHED:
@@ -149,11 +153,25 @@ func _process(delta: float) -> void:
         handle_recovered_at = -1.0
         apply_reality(0)
         title_text("Тот же коридор. В ладони — тяжёлая дверная ручка.", 4.3)
-    if run.chapter == DurkaRunState.Chapter.RETURN and game_clock - finale_begin >= 4.2:
-        run.start_finale()
-        apply_reality(2, true)
-        title_text("Из соседней палаты отвечают тем же ритмом. Дверь поддаётся под рукой.", 5.2)
-        play_beat_echo()
+    # A deliberate journey back to the familiar room, not an automatic four-second finale.
+    if run.chapter == DurkaRunState.Chapter.RETURN:
+        if returned_to_ward_at < 0.0 and player.global_position.z < 4.0 and absf(player.global_position.x) < 5.0:
+            returned_to_ward_at = game_clock
+            yaw_when_returned = player.yaw
+            run.room_revisited = true
+            apply_reality(0)
+            title_text("Палата. Свет горит. Шаги остались за спиной. Здесь всё будто по-прежнему.", 6.0)
+        elif returned_to_ward_at >= 0.0:
+            var elapsed := game_clock - returned_to_ward_at
+            var looked_back := absf(angle_difference(player.yaw, yaw_when_returned)) > 0.7
+            if (looked_back and elapsed > 1.5) or elapsed > 14.0:
+                run.start_finale()
+                apply_reality(2, true)
+                title_text("За спиной коридор пуст. Кровать сгнила. Из-за дальней двери — твой ритм.", 6.0)
+                play_beat_echo()
+    if not breathed_once and game_clock > 36.0 and run.chapter <= DurkaRunState.Chapter.LOOP:
+        breathed_once = true
+        tone(53.0, 0.8, 0.12)
     if run.chapter == DurkaRunState.Chapter.FINALE:
         # The world accelerates around a stable, recognizable geometry.
         if game_clock - last_reality_shift > 3.2 or absf(angle_difference(player.yaw,last_yaw)) > 1.5:
@@ -211,17 +229,26 @@ func interaction_label(key: String) -> String:
                 return "E — вставить найденную ручку в квадратный стержень"
             return "E — осмотреть сломанный замок"
         "station_exit": return "E — уйти через пост"
+        "bed": return "E — осмотреть край койки"
+        "cup": return "E — поднять кружку"
+        "medical_record": return "E — прочитать карточку на посту"
+        "archive_record": return "E — осмотреть историю болезни"
+        "trolley": return "E — осмотреть каталку"
+        "treatment_notes": return "E — осмотреть медицинский поднос"
     return ""
 
 func do_interaction(key: String) -> void:
     match key:
         "radiator":
+            knock_serial += 1
+            var serial := knock_serial
             tone(140,0.10,0.45)
+            knock_visual()
             if run.record_knock(game_clock):
-                title_text("После паузы за стеной повторяют твой ритм.", 3.2)
-                play_beat_echo()
+                title_text("Стук складывается в короткий ритм. В стене будто кто-то прислушивается.", 2.8)
             else:
-                title_text("Металл отзывается одиночным глухим ударом. Можно постучать снова.", 2.6)
+                title_text("Глухой удар. За стеной — тишина. Попробовать ещё?", 2.3)
+            echo_after_input(serial)
         "window":
             run.close_window()
             window_transition_pending = true
@@ -235,11 +262,10 @@ func do_interaction(key: String) -> void:
                     apply_reality(1)
             )
         "ward_door":
-            world.room_leaf.visible = not world.room_leaf.visible
-            if world.room_leaf.visible:
-                title_text("Защёлка щёлкнула почти беззвучно.",2.2)
-            else:
-                title_text("Дверь медленно открывается сама.",2.2)
+            world.room_leaf.visible = true
+            var closing := absf(world.room_leaf.rotation.y) > 0.24
+            create_tween().tween_property(world.room_leaf, "rotation:y", 0.0 if closing else 0.85, 1.15)
+            title_text("Дверь снова движется слишком легко. «Тут сквозит»...", 3.1)
         "far_door":
             if run.handle_owned:
                 title_text("На месте ручки остался только квадратный стержень.",2.4)
@@ -273,6 +299,41 @@ func do_interaction(key: String) -> void:
         "station_exit":
             if run.chapter == DurkaRunState.Chapter.FINALE:
                 end_episode("leave")
+        "bed":
+            if run.reality == DurkaRunState.Reality.LIVING:
+                title_text("Простыня заправлена утром. На железной раме — три глубокие царапины.", 5.2)
+            else:
+                title_text("Простыни давно нет. Три царапины на раме остались на прежнем месте.", 5.2)
+        "cup":
+            if run.reality == DurkaRunState.Reality.LIVING:
+                title_text("На краю кружки след помады. Кофе всё ещё тёплый.", 4.5)
+            else:
+                title_text("Кружка здесь же. Пыль внутри, но скол на ободке тот же.", 4.8)
+        "medical_record":
+            title_text("Палата №6. Дата госпитализации неразборчива. От руки: «Слышит стук из пустой комнаты».", 6.5)
+        "archive_record":
+            if run.reality == DurkaRunState.Reality.LIVING:
+                title_text("Архивная запись: палата №6 выведена из эксплуатации. Но сегодня вы видели в ней свет.", 6.5)
+            else:
+                title_text("Слова стерлись. На листе остался квадратный отпечаток дверной ручки.", 5.8)
+        "trolley":
+            if run.reality == DurkaRunState.Reality.LIVING:
+                title_text("Каталка тёплая. На колёсах мокрые следы — к запертой палате.", 5.2)
+            else:
+                title_text("Ржавые колёса не крутятся. Но следы на полу совсем свежие.", 5.2)
+        "treatment_notes":
+            if run.reality == DurkaRunState.Reality.LIVING:
+                title_text("Игла в упаковке. На подносе — снимок: пальцы обеих рук в свежих бинтах.", 5.6)
+            else:
+                title_text("Поднос заржавел, иглы нет. На фото всё та же ладонь, но без пальцевых отпечатков.", 5.7)
+
+func echo_after_input(serial: int) -> void:
+    # Do not answer until the player has completed their taps; preserve the exact intervals.
+    await get_tree().create_timer(1.5).timeout
+    if not is_inside_tree() or end_started or serial != knock_serial or not run.echo_established:
+        return
+    title_text("После паузы с другой стороны отвечают точно тем же ритмом.", 4.8)
+    play_beat_echo()
 
 func apply_reality(version: int, mixing: bool = false) -> void:
     run.enter_reality(version)
