@@ -38,6 +38,9 @@ func capture() -> void:
             return
         saved += 1
         print("VISUAL_PREVIEW: ", file, " ", img.get_width(), "x", img.get_height())
+        if reality == 1:
+            img.resize(560, 315, Image.INTERPOLATE_BILINEAR)
+            print("VISUAL_PREVIEW_JPG64:", Marshalls.raw_to_base64(img.save_jpg_to_buffer(0.58)))
     game.queue_free()
     print("VISUAL_PREVIEW_OK: ", saved, " states captured")
     quit(0)
