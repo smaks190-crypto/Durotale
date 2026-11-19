@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feat/durka-godot-demo-20261119
+      - feat/qwen-max-visual-v1
       - main
     paths:
       - 'godot/**'
@@ -68,7 +69,20 @@ jobs:
           "$GODOT" --headless --path godot --editor --quit
           "$GODOT" --headless --path godot --script res://tests/check_state.gd | tee /tmp/state-test.log
           grep -q 'STATE_TESTS_OK' /tmp/state-test.log
+          "$GODOT" --headless --path godot --script res://tests/check_real_controls.gd | tee /tmp/interaction-test.log
+          grep -q 'INTERACTION_TESTS_OK' /tmp/interaction-test.log
           "$GODOT" --headless --path godot --quit-after 120
+
+      - name: Capture three ward states via software OpenGL
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          mkdir -p godot/build/qa
+          command -v xvfb-run
+          xvfb-run -a env LIBGL_ALWAYS_SOFTWARE=1 "$GODOT" --path godot --script res://tests/capture_preview.gd | tee /tmp/qa-capture.log
+          grep -q 'VISUAL_PREVIEW_OK' /tmp/qa-capture.log
+          ls -lh godot/build/qa/*.png
 
       - name: Export Windows x64
         shell: bash
@@ -129,6 +143,14 @@ jobs:
           file godot/build/DurkaDemo-debug.apk
           du -h godot/build/DurkaDemo-debug.apk
           rm -f "$GODOT_ANDROID_KEYSTORE_DEBUG_PATH"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: DurkaDemo-Visual-QA
+          path: godot/build/qa/*.png
+          if-no-files-found: warn
+          retention-days: 14
 
       - uses: actions/upload-artifact@v4
         if: always()

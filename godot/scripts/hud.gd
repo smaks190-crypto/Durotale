@@ -10,6 +10,7 @@ signal restart_requested
 var root: Control
 var hint: Label
 var subtitle: Label
+var subtitle_back: Panel
 var inventory: Label
 var touch_controls: Control
 var options_panel: PanelContainer
@@ -77,12 +78,26 @@ void fragment() {
     hint.anchor_bottom = 0.76
     root.add_child(hint)
 
-    subtitle = text_label("",23,Color(0.95,0.94,0.89))
-    subtitle.anchor_left = 0.12
-    subtitle.anchor_right = 0.88
-    subtitle.anchor_top = 0.79
-    subtitle.anchor_bottom = 0.94
+    # Restrained survival-horror dialogue frame, not floating bright UI.
+    subtitle_back = Panel.new()
+    subtitle_back.anchor_left = 0.125
+    subtitle_back.anchor_right = 0.875
+    subtitle_back.anchor_top = 0.80
+    subtitle_back.anchor_bottom = 0.94
+    subtitle_back.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    var paper_frame := StyleBoxFlat.new()
+    paper_frame.bg_color = Color(0.017, 0.018, 0.02, 0.80)
+    paper_frame.border_color = Color(0.55, 0.54, 0.51, 0.8)
+    paper_frame.set_border_width_all(1)
+    subtitle_back.add_theme_stylebox_override("panel", paper_frame)
+    root.add_child(subtitle_back)
+    subtitle = text_label("",23,Color(0.91,0.90,0.85))
+    subtitle.anchor_left = 0.15
+    subtitle.anchor_right = 0.85
+    subtitle.anchor_top = 0.81
+    subtitle.anchor_bottom = 0.93
     root.add_child(subtitle)
+    subtitle_back.visible = false
 
     make_touch_controls()
     make_options()
@@ -93,6 +108,7 @@ func set_hint(value: String) -> void:
 
 func set_subtitle(value: String) -> void:
     subtitle.text = value
+    subtitle_back.visible = not value.is_empty()
 
 func set_inventory(has_handle: bool, installed: bool) -> void:
     if installed:
@@ -112,9 +128,16 @@ func make_button(txt: String, bounds: Rect2, action: String) -> Button:
     b.size = bounds.size
     b.modulate = Color(1,1,1,0.73)
     b.focus_mode = Control.FOCUS_NONE
-    b.button_down.connect(func() -> void: Input.action_press(action))
-    b.button_up.connect(func() -> void: Input.action_release(action))
+    b.mouse_filter = Control.MOUSE_FILTER_IGNORE
     touch_controls.add_child(b)
+    var key := TouchScreenButton.new()
+    var shape := RectangleShape2D.new()
+    shape.size = bounds.size
+    key.shape = shape
+    key.position = bounds.get_center()
+    key.action = action
+    key.passby_press = action != "interact"
+    touch_controls.add_child(key)
     return b
 
 func make_touch_controls() -> void:
@@ -188,6 +211,7 @@ func make_ending() -> void:
     ending_panel.anchor_bottom = 0.73
     root.add_child(ending_panel)
     var content := VBoxContainer.new()
+    content.name = "VBoxContainer"
     content.add_theme_constant_override("separation",18)
     ending_panel.add_child(content)
     var end_title := text_label("ПАЛАТА №0",38,Color(0.93,0.92,0.91))
@@ -208,6 +232,7 @@ func show_ending(choice: String) -> void:
     touch_controls.visible = false
     hint.visible = false
     subtitle.visible = false
+    subtitle_back.visible = false
     inventory.visible = false
     var label: Label = ending_panel.get_node("VBoxContainer/Text")
     if choice == "hold":
