@@ -1,0 +1,149 @@
+name: Durka Godot 4.7.2 — Windows and Android
+
+on:
+  push:
+    branches:
+      - feat/durka-godot-demo-20261119
+      - main
+    paths:
+      - 'godot/**'
+      - '.github/workflows/durka-godot-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Java 17 for Android tools
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install Android SDK components
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager 'platform-tools' 'platforms;android-35' 'build-tools;35.0.1'
+          sdkmanager --list_installed | grep -E 'platform-tools|platforms;android-35|build-tools;35.0.1'
+
+      - name: Download official Godot 4.7.2 and export templates
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/godot"
+          curl -fL --retry 4 --retry-delay 5 -o "$RUNNER_TEMP/godot/engine.zip"             'https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip'
+          unzip -q "$RUNNER_TEMP/godot/engine.zip" -d "$RUNNER_TEMP/godot"
+          chmod +x "$RUNNER_TEMP/godot/Godot_v4.7.2-stable_linux.x86_64"
+          curl -fL --retry 4 --retry-delay 5 -o "$RUNNER_TEMP/godot/templates.tpz"             'https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_export_templates.tpz'
+          python3 - <<'PY'
+          import pathlib,zipfile,shutil
+          src=pathlib.Path(__import__('os').environ['RUNNER_TEMP'])/'godot/templates.tpz'
+          dst=pathlib.Path.home()/'.local/share/godot/export_templates/4.7.2.stable'
+          dst.mkdir(parents=True,exist_ok=True)
+          names=('windows_release_x86_64.exe','windows_debug_x86_64.exe',
+                 'android_debug.apk','android_release.apk')
+          with zipfile.ZipFile(src) as archive:
+              for name in names:
+                  with archive.open('templates/'+name) as r, (dst/name).open('wb') as w:
+                      shutil.copyfileobj(r,w)
+                  print(name,(dst/name).stat().st_size)
+          PY
+          echo "GODOT=$RUNNER_TEMP/godot/Godot_v4.7.2-stable_linux.x86_64" >> "$GITHUB_ENV"
+
+      - name: Import and run logic/runtime tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$GODOT" --headless --path godot --editor --quit
+          "$GODOT" --headless --path godot --script res://tests/check_state.gd | tee /tmp/state-test.log
+          grep -q 'STATE_TESTS_OK' /tmp/state-test.log
+          "$GODOT" --headless --path godot --quit-after 120
+
+      - name: Export Windows x64
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p godot/build
+          "$GODOT" --headless --path godot --export-release 'Windows Desktop' "$PWD/godot/build/DurkaDemo.exe"
+          test -s godot/build/DurkaDemo.exe
+          test -s godot/build/DurkaDemo.pck
+          file godot/build/DurkaDemo.exe
+          du -h godot/build/DurkaDemo.*
+
+      - name: Configure Android signing and editor SDK paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-${ANDROID_HOME:-$HOME/Android/Sdk}}" >> "$GITHUB_ENV"
+          mkdir -p "$HOME/.local/share/godot/keystores"
+          if [ ! -f "$HOME/.local/share/godot/keystores/debug.keystore" ]; then
+            keytool -genkeypair -keystore "$HOME/.local/share/godot/keystores/debug.keystore" \
+              -storepass android -alias androiddebugkey -keypass android \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname 'CN=Android Debug, OU=Android, O=Android, L=Mountain View, ST=California, C=US'
+          fi
+          python3 - <<'PY'
+          import os,pathlib,re,json
+          p=pathlib.Path.home()/'.config/godot/editor_settings-4.7.tres'
+          if not p.is_file():
+              raise SystemExit('Godot editor settings missing, import step did not initialize')
+          txt=p.read_text()
+          conf={
+            'export/android/java_sdk_path':os.environ['JAVA_HOME'],
+            'export/android/android_sdk_path':os.getenv('ANDROID_SDK_ROOT') or os.getenv('ANDROID_HOME'),
+            'export/android/debug_keystore':str(pathlib.Path.home()/'.local/share/godot/keystores/debug.keystore'),
+            'export/android/debug_keystore_pass':'android'
+          }
+          for key,val in conf.items():
+              if not val: raise SystemExit('Missing '+key)
+              line=key+' = '+json.dumps(val)
+              pattern=r'^'+re.escape(key)+r'\s*=.*$'
+              if re.search(pattern,txt,re.M):txt=re.sub(pattern,lambda _m:line,txt,flags=re.M)
+              else:txt+='\n'+line
+          p.write_text(txt)
+          print('Android export SDK settings written')
+          PY
+
+      - name: Export Android arm64 debug APK
+        shell: bash
+        env:
+          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ github.workspace }}/.ci-debug.keystore
+          GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
+          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
+        run: |
+          set -euo pipefail
+          cp "$HOME/.local/share/godot/keystores/debug.keystore" "$GODOT_ANDROID_KEYSTORE_DEBUG_PATH"
+          "$GODOT" --headless --path godot --export-debug Android "$PWD/godot/build/DurkaDemo-debug.apk"
+          test -s godot/build/DurkaDemo-debug.apk
+          file godot/build/DurkaDemo-debug.apk
+          du -h godot/build/DurkaDemo-debug.apk
+          rm -f "$GODOT_ANDROID_KEYSTORE_DEBUG_PATH"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: DurkaDemo-Windows-x64
+          path: |
+            godot/build/DurkaDemo.exe
+            godot/build/DurkaDemo.pck
+          if-no-files-found: warn
+          retention-days: 14
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: DurkaDemo-Android-debug
+          path: godot/build/DurkaDemo-debug.apk
+          if-no-files-found: warn
+          retention-days: 14
