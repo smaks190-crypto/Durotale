@@ -106,6 +106,14 @@ func _ready() -> void:
     head.radial_segments = 7
     head.rings = 4
     make_part(body_mesh,head,Vector3(0,1.74,0),skin)
+    # A back-of-head shell preserves the human silhouette in the default
+    # rear camera: without it the exposed skin resembles a white helmet band.
+    var back_hair := SphereMesh.new()
+    back_hair.radius = 0.282
+    back_hair.height = 0.47
+    back_hair.radial_segments = 9
+    back_hair.rings = 5
+    make_part(body_mesh,back_hair,Vector3(0,1.79,0.115),Color(0.065,0.062,0.062))
     var hair := SphereMesh.new()
     hair.radius = 0.275
     hair.height = 0.29
