@@ -1,92 +1,81 @@
 extends SceneTree
-
-var game
-var choice := ""
-
-func _initialize() -> void:
-    call_deferred("exercise")
-
-func check(ok: bool, message: String) -> void:
+var g
+var failures:=0
+func _initialize():call_deferred("exercise")
+func check(ok:bool,text:String):
     if not ok:
-        push_error(choice + ": " + message)
-        quit(1)
-        await process_frame
-
-func tap() -> void:
-    Input.action_press("interact")
-    await process_frame
-    await process_frame
-    Input.action_release("interact")
-    await process_frame
-    await process_frame
-
-func walk(x: float, z: float) -> void:
-    var goal := Vector2(x,z)
-    for i in 1000:
-        var delta := goal - Vector2(game.player.position.x, game.player.position.z)
-        if delta.length() < 0.12:
-            break
-        var yaw := atan2(-delta.x,-delta.y)
-        var motion := InputEventScreenDrag.new()
-        motion.position.x = 1200
-        motion.relative.x = -angle_difference(game.player.yaw,yaw)/(1.6*game.player.sensitivity)
-        game.player._unhandled_input(motion)
-        Input.action_press("move_forward")
+        failures+=1
+        push_error(text)
+func key(down:bool):
+    var e:=InputEventKey.new()
+    e.physical_keycode=KEY_E
+    e.pressed=down
+    Input.parse_input_event(e)
+    Input.flush_buffered_events()
+func tap():
+    key(true)
+    await physics_frame
+    key(false)
+    await physics_frame
+func move_to(x:float,z:float):
+    var goal:=Vector2(x,z)
+    for i in 750:
+        var d:=goal-Vector2(g.patient.position.x,g.patient.position.z)
+        if d.length()<.085:break
+        g.look(Vector2(-angle_difference(g.yaw,atan2(-d.x,-d.y))/g.sens,0))
+        g.joy=Vector2.UP
         await physics_frame
-    Input.action_release("move_forward")
-    await process_frame
-    await check(Vector2(game.player.position.x,game.player.position.z).distance_to(goal)<0.25, "Blocked on route to %s at %s" % [goal,game.player.position])
-
-func exercise() -> void:
-    for ending in ["hold","leave"]:
-        choice = ending
-        game = load("res://scenes/main.tscn").instantiate()
-        root.add_child(game)
-        await process_frame
+    g.joy=Vector2.ZERO
+    await physics_frame
+    check(goal.distance_to(Vector2(g.patient.position.x,g.patient.position.z))<.20,"Путь %s → %s"%[g.patient.position,goal])
+func exercise():
+    for pick in ["hold","leave"]:
+        g=load("res://chapter.tscn").instantiate()
+        root.add_child(g)
+        await physics_frame
         await tap()
-        await walk(-4.6,-1)
+        await move_to(-2.85,.95)
         await tap()
-        await create_timer(0.43).timeout
+        await create_timer(.39).timeout
         await tap()
-        await check(game.run.echo_established,"early knocks")
-        await walk(-1,-4.9)
+        await create_timer(2.6).timeout
+        check(g.answered and abs(g.pattern[0]-.4)<.07,"Ранний ритм")
+        await move_to(.54,.65)
+        await move_to(.54,-3.39)
+        await move_to(.36,-3.52)
         await tap()
-        await check(game.run.window_closed,"window")
-        await walk(-2,-4)
-        await walk(-2,0)
-        await walk(0,0)
-        await check(game.world.reality == 1,"abandoned ward")
-        await walk(0,6)
-        for i in 3:
-            await walk(0,26.4)
-            await create_timer(2.2).timeout
+        await move_to(.96,-3.55)
+        await move_to(2.46,-3.52)
+        await move_to(2.46,-8.)
+        check(g.closed and g.ward.version==1,"Форточка")
+        for j in 3:
+            await move_to(2.44,-19.83)
+            await create_timer(3.2).timeout
             await tap()
-        await check(game.run.handle_owned and game.run.far_door_attempts == 3,"slow opens")
-        await create_timer(4).timeout
-        for version in [1,2,0]:
-            game.apply_reality(version)
-            await check(game.run.handle_owned,"persistent handle")
-        await walk(0,19.85)
-        await walk(1.15,20)
+            await create_timer(.55).timeout
+        check(g.visits==3 and g.pocket,"Три медленных открытия")
+        await create_timer(4.4).timeout
+        check(g.pocket and g.ward.version==0,"Ручка после перехода")
+        await move_to(2.3,-13.3)
+        await move_to(1.38,-13.3)
         await tap()
-        await check(game.run.handle_installed,"install")
-        await walk(0,4.9)
-        await create_timer(6.1).timeout
-        await check(game.run.chapter == game.run.Chapter.FINALE,"return")
-        if ending == "hold":
-            await walk(0,19.85)
-            await walk(1.15,20)
-            Input.action_press("interact")
-            await create_timer(2.3).timeout
-            Input.action_release("interact")
+        check(g.fitted,"Установка")
+        await move_to(2.45,-12.6)
+        await move_to(2.45,-3.31)
+        await move_to(2.45,-8.1)
+        check(g.finale,"Возвращение")
+        if pick=="hold":
+            await move_to(2.42,-13.3)
+            await move_to(1.38,-13.3)
+            key(true)
+            await create_timer(2.1).timeout
+            key(false)
         else:
-            await walk(0,10)
+            await move_to(3.13,-8.1)
             await tap()
-        await check(game.run.ending == ending,"ending")
-        await create_timer(3.7).timeout
-        await check(game.hud.ending_panel.visible,"replay screen")
-        game.queue_free()
+        await create_timer(4.4).timeout
+        check(g.ending_name==pick and g.ending.visible,"Конец "+pick)
+        g.queue_free()
         await process_frame
-        await process_frame
-    print("INTERACTION_TESTS_OK")
-    quit()
+    print("INTERACTION_TESTS_OK" if failures==0 else "ROUTES_FAILED")
+    quit(int(failures>0))
