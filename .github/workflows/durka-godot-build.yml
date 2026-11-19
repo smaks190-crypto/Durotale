@@ -75,7 +75,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p godot/build
-          "$GODOT" --headless --path godot --export-release 'Windows Desktop' godot/build/DurkaDemo.exe
+          "$GODOT" --headless --path godot --export-release 'Windows Desktop' "$PWD/godot/build/DurkaDemo.exe"
           test -s godot/build/DurkaDemo.exe
           test -s godot/build/DurkaDemo.pck
           file godot/build/DurkaDemo.exe
@@ -119,7 +119,7 @@ jobs:
         run: |
           set -euo pipefail
           cp "$HOME/.local/share/godot/keystores/debug.keystore" "$GODOT_ANDROID_KEYSTORE_DEBUG_PATH"
-          "$GODOT" --headless --path godot --export-debug Android godot/build/DurkaDemo-debug.apk
+          "$GODOT" --headless --path godot --export-debug Android "$PWD/godot/build/DurkaDemo-debug.apk"
           test -s godot/build/DurkaDemo-debug.apk
           file godot/build/DurkaDemo-debug.apk
           du -h godot/build/DurkaDemo-debug.apk
