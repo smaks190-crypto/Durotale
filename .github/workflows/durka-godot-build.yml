@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feat/durka-godot-demo-20261119
+      - feat/qwen-max-visual-v1
       - main
     paths:
       - 'godot/**'
@@ -68,6 +69,8 @@ jobs:
           "$GODOT" --headless --path godot --editor --quit
           "$GODOT" --headless --path godot --script res://tests/check_state.gd | tee /tmp/state-test.log
           grep -q 'STATE_TESTS_OK' /tmp/state-test.log
+          "$GODOT" --headless --path godot --script res://tests/check_real_controls.gd | tee /tmp/interaction-test.log
+          grep -q 'INTERACTION_TESTS_OK' /tmp/interaction-test.log
           "$GODOT" --headless --path godot --quit-after 120
 
       - name: Export Windows x64
