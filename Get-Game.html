@@ -1,0 +1,49 @@
+<!doctype html><html lang="ru"><meta charset="utf-8"><title>Дурка · Скачать игру</title>
+<style>body{max-width:38em;margin:12vh auto;padding:0 20px;font:18px/1.5 system-ui;color:#232425;background:#faf9f6}button,a{font:inherit}button{padding:.6em 1em;cursor:pointer}progress{display:block;width:100%;margin:1em 0}</style>
+<h1>Дурка — Сквозняк</h1><p>Выберите ранее скачанный ZIP со сборкой Durotale. Страница извлечёт из него обычный архив с игрой на вашем компьютере.</p>
+<button id="choose">Выбрать скачанный ZIP</button><input type="file" accept=".zip" id="input" hidden>
+<progress value="0" max="91" hidden></progress><p id="status" role="status"></p><a id="save" hidden download="Durka-Windows-x64.zip">Сохранить ZIP с Durka.exe</a>
+<script>
+const get=id=>document.getElementById(id);
+const bar=document.querySelector('progress');
+get('choose').onclick=()=>get('input').click();
+get('input').onchange=async e=>{
+ const file=e.target.files[0]; if(!file)return;
+ get('save').hidden=true;get('choose').disabled=true;bar.value=0;
+ try {
+  get('status').textContent='Читаю архив…';
+  const data=await file.arrayBuffer(),v=new DataView(data),src=new Uint8Array(data);
+  const u16=p=>v.getUint16(p,true),u32=p=>v.getUint32(p,true);
+  let end=data.byteLength-22;
+  while(end>=0 && u32(end)!==0x06054b50)end--;
+  if(end<0)throw Error('Файл ZIP повреждён.');
+  const parts=new Map();
+  let pos=u32(end+16);
+  for(let i=0;i<u16(end+10);i++){
+   if(u32(pos)!==0x02014b50)throw Error('Оглавление ZIP повреждено.');
+   const len=u16(pos+28),name=new TextDecoder().decode(src.subarray(pos+46,pos+46+len));
+   const match=name.match(/(?:^|\/)Windows\/payload\/(\d{3})\.b64$/);
+   if(match)parts.set(Number(match[1]),{offset:u32(pos+42),size:u32(pos+20),method:u16(pos+10)});
+   pos+=46+len+u16(pos+30)+u16(pos+32);
+  }
+  if(parts.size!==91)throw Error('Выберите исходный ZIP со сборкой Windows, в котором лежит папка Windows/payload.');
+  const bytes=[];
+  for(let i=0;i<91;i++){
+   const {offset,size,method}=parts.get(i);
+   const start=offset+30+u16(offset+26)+u16(offset+28);
+   let stream=new Blob([src.subarray(start,start+size)]).stream();
+   if(method===8)stream=stream.pipeThrough(new DecompressionStream('deflate-raw'));
+   else if(method!==0)throw Error('Неизвестный формат сжатия.');
+   const str=atob(await new Response(stream).text()),chunk=new Uint8Array(str.length);
+   for(let j=0;j<chunk.length;j++)chunk[j]=str.charCodeAt(j);
+   bytes.push(chunk);bar.value=i+1;
+  }
+  const zip=new Blob(bytes,{type:'application/zip'});
+  const sum=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await zip.arrayBuffer())),x=>x.toString(16).padStart(2,'0')).join('');
+  if(sum!=='a8f581e73cce0a99a6bab62be2d5f7a34e1c4da7a313e299c18746aa8e92ef3f')throw Error('Контрольная сумма не совпала. Скачайте сборку заново.');
+  const link=get('save');if(link.href)URL.revokeObjectURL(link.href);link.href=URL.createObjectURL(zip);link.hidden=false;
+  get('status').textContent='Готово. Сохраните ZIP, нажмите «Извлечь всё» и откройте Durka.exe.';
+ } catch(err){get('status').textContent='Ошибка: '+err.message;}
+ finally {get('choose').disabled=false;e.target.value='';}
+};
+</script></html>
