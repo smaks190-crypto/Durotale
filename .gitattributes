@@ -1,0 +1,11 @@
+.github export-ignore
+.gitignore export-ignore
+.gitattributes export-ignore
+*.cs export-ignore
+*.uid export-ignore
+*.sln export-ignore
+*.tscn export-ignore
+*.godot export-ignore
+*.csproj export-ignore
+*.cfg export-ignore
+shaders export-ignore

